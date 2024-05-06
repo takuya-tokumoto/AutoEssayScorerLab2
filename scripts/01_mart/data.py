@@ -8,17 +8,21 @@ import re
 import spacy
 import string
 import random
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
-from sklearn.ensemble import GradientBoostingClassifier,BaggingClassifier
 from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer, HashingVectorizer
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
 from sklearn.metrics import cohen_kappa_score
 from lightgbm import log_evaluation, early_stopping
 import polars as pl
 import joblib
 import os
+import yaml
+from utils import *
+
+# 設定を読み込む
+config_path = './00_param/config.yaml'
+config = load_config(config_path)
+
 
 class CreateDataset():
 
@@ -28,6 +32,7 @@ class CreateDataset():
         self.config = config
 
     def load_data(self, path, file_name):
+        """読み込みの関数"""
         columns = [
             pl.col("full_text").str.split(by="\n\n").alias("paragraph")
         ]
@@ -35,7 +40,7 @@ class CreateDataset():
         return pl.read_csv(data_path).with_columns(columns)
 
     def load_dataset(self):
-        """データの読み込み"""
+        """データ読み込み"""
         self.train_data = self.load_data(self.config['input_dir'], "learning-agency-lab-automated-essay-scoring-2/train.csv")
         self.test_data = self.load_data(self.config['input_dir'], "learning-agency-lab-automated-essay-scoring-2/test.csv")
 
@@ -191,7 +196,6 @@ class CreateDataset():
 
         return df
 
-    # sentence feature
     def Sentence_Preprocess(self, tmp):
         """
         テキストデータを文単位に前処理し、各文の長さと単語数を計算。
@@ -263,7 +267,6 @@ class CreateDataset():
 
         return df
 
-    # word feature
     def Word_Preprocess(self, tmp):
         """
         テキストデータを単語単位に前処理し、各単語の長さを計算した後、長さが0の単語を除外します。
@@ -290,7 +293,6 @@ class CreateDataset():
         
         return tmp
 
-    # feature_eng
     def Word_Eng(self, train_tmp):
         """
         テキストデータ内の単語の長さに関する統計量を集計し、エッセイIDごとに結果をまとめる。
@@ -323,7 +325,7 @@ class CreateDataset():
         df = df.to_pandas()
         return df
 
-    def TfidfVec_eng(self): # 自分で関数化
+    def fit_transform_TfidfVec(self, train_data): # 自分で関数化
         """
         この関数は、クラス内の学習データとテストデータに対してTF-IDFベクトル化を行い、
         結果をDataFrame形式で返す。各DataFrameには、テキストデータがTF-IDF値に変換された特徴量列と、
@@ -358,25 +360,31 @@ class CreateDataset():
                     sublinear_tf=True,
         )
 
-        ## 学習データ(train_data)の処理
-        train_tfid = vectorizer.fit_transform([i for i in self.train_data['full_text']])
+        # 学習データ(train_data)の処理
+        train_tfid = vectorizer.fit_transform([i for i in train_data['full_text']])
+        joblib.dump(vectorizer, os.path.join(config['output_dir'],config['model_name'],'vectorizer.pkl'))
         dense_matrix = train_tfid.toarray()
         tr_df = pd.DataFrame(dense_matrix)
         tfid_columns = [ f'tfid_{i}' for i in range(len(tr_df.columns))]
         tr_df.columns = tfid_columns
-        tr_df['essay_id'] = self.train_data['essay_id']
+        tr_df['essay_id'] = train_data['essay_id']
 
-        ## テストデータ(test_data)の処理
-        test_tfid = vectorizer.transform([i for i in self.test_data['full_text']])
+        return tr_df
+
+    def transform_TfidfVec(self, test_data): # 自分で関数化    
+        
+        # テストデータ(test_data)の処理
+        vectorizer = joblib.load(os.path.join(config['output_dir'],config['model_name'],'vectorizer.pkl'))
+        test_tfid = vectorizer.transform([i for i in test_data['full_text']])
         dense_matrix = test_tfid.toarray()
         te_df = pd.DataFrame(dense_matrix)
         tfid_columns = [ f'tfid_{i}' for i in range(len(te_df.columns))]
         te_df.columns = tfid_columns
-        te_df['essay_id'] = self.test_data['essay_id']
+        te_df['essay_id'] = test_data['essay_id']
 
-        return tr_df, te_df
+        return  te_df
 
-    def CountVec_eng(self): # 自分で関数化
+    def fit_transform_CountVec(self, train_data): # 自分で関数化
         """
         与えられたデータセットからカウントベクトルを生成し、特徴データフレームとして返します。
 
@@ -407,84 +415,110 @@ class CreateDataset():
         )
 
         ## 学習データ(train_data)の処理
-        train_tfid = vectorizer_cnt.fit_transform([i for i in self.train_data['full_text']])
+        train_tfid = vectorizer_cnt.fit_transform([i for i in train_data['full_text']])
+        joblib.dump(vectorizer_cnt, os.path.join(config['output_dir'],config['model_name'],'vectorizer_cnt.pkl'))
         dense_matrix = train_tfid.toarray()
         tr_df = pd.DataFrame(dense_matrix)
         tfid_columns = [ f'tfid_cnt_{i}' for i in range(len(tr_df.columns))]
         tr_df.columns = tfid_columns
-        tr_df['essay_id'] = self.train_data['essay_id']
+        tr_df['essay_id'] = train_data['essay_id']
+
+        return tr_df
+
+    def transform_CountVec(self, test_data):
 
         ## テストデータ(test_data)の処理
-        test_tfid = vectorizer_cnt.transform([i for i in self.test_data['full_text']])
+        vectorizer_cnt = joblib.load(os.path.join(config['output_dir'],config['model_name'],'vectorizer_cnt.pkl'))
+        test_tfid = vectorizer_cnt.transform([i for i in test_data['full_text']])
         dense_matrix = test_tfid.toarray()
         te_df = pd.DataFrame(dense_matrix)
         tfid_columns = [ f'tfid_cnt_{i}' for i in range(len(te_df.columns))]
         te_df.columns = tfid_columns
-        te_df['essay_id'] = self.test_data['essay_id']
+        te_df['essay_id'] = test_data['essay_id']
 
-        return tr_df, te_df
+        return te_df
 
-    def preprocessing_train(self, train_data):
+    def preprocessing_train(self):
         """学習データ(train_data)に対して一連の処理を実行"""
+
+        self.load_dataset()
         
         # Paragraph
-        tmp = self.Paragraph_Preprocess(train_data)
+        tmp = self.Paragraph_Preprocess(self.train_data)
         train_feats = self.Paragraph_Eng(tmp)
 
         # Score
-        train_feats['score'] = train_data['score']
+        train_feats['score'] = self.train_data['score']
 
         # Sentence
-        tmp = self.Sentence_Preprocess(train_data)
+        tmp = self.Sentence_Preprocess(self.train_data)
         train_feats = train_feats.merge(self.Sentence_Eng(tmp), on='essay_id', how='left')
 
         # Word
-        tmp = self.Word_Preprocess(train_data)
+        tmp = self.Word_Preprocess(self.train_data)
         train_feats = train_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left') 
         
+        # TfidfVectorizer
+        tmp = self.fit_transform_TfidfVec(self.train_data)
+        train_feats = train_feats.merge(tmp, on='essay_id', how='left')
+
+        # CountVectorizer
+        tmp = self.fit_transform_CountVec(self.train_data)
+        train_feats = train_feats.merge(tmp, on='essay_id', how='left')
+
         return train_feats
 
-    def preprocessing_test(self, test_data):
+    def preprocessing_test(self):
         """テストデータ(train_data)に対して一連の処理を実行"""
-
-        # Paragraph
-        tmp = self.Paragraph_Preprocess(test_data)
-        test_feats = self.Paragraph_Eng(tmp)
-
-        # Sentence
-        tmp = self.Sentence_Preprocess(test_data)
-        test_feats = test_feats.merge(self.Sentence_Eng(tmp), on='essay_id', how='left')
-
-        # Word
-        tmp = self.Word_Preprocess(test_data)
-        test_feats = test_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left')
-
-        return test_feats
-
-    def pipline(self):
-        """学習データとテストデータに対して処理を実施して返す"""
 
         self.load_dataset()
 
-        train_data = self.preprocessing_train(self.train_data)
-        test_data  = self.preprocessing_test(self.test_data)
+        # Paragraph
+        tmp = self.Paragraph_Preprocess(self.test_data)
+        test_feats = self.Paragraph_Eng(tmp)
+
+        # Sentence
+        tmp = self.Sentence_Preprocess(self.test_data)
+        test_feats = test_feats.merge(self.Sentence_Eng(tmp), on='essay_id', how='left')
+
+        # Word
+        tmp = self.Word_Preprocess(self.test_data)
+        test_feats = test_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left')
 
         # TfidfVectorizer
-        tr_Tfidf_tmp, te_Tfidf_tmp = self.TfidfVec_eng()
-        # CountVectorizer
-        tr_CountVec_tmp, te_CountVec_tmp = self.CountVec_eng()
-        # JOIN
-        train_data = (
-            train_data
-                .merge(tr_Tfidf_tmp, on='essay_id', how='left')
-                .merge(tr_CountVec_tmp, on='essay_id', how='left')
-            )
-        test_data = (
-            test_data
-                .merge(te_Tfidf_tmp, on='essay_id', how='left')
-                .merge(te_CountVec_tmp, on='essay_id', how='left')
-            )
+        tmp = self.transform_TfidfVec(self.test_data)
+        test_feats = test_feats.merge(tmp, on='essay_id', how='left')
 
-        return train_data, test_data
+        # CountVectorizer
+        tmp = self.transform_CountVec(self.test_data)
+        test_feats = test_feats.merge(tmp, on='essay_id', how='left')
+
+        return test_feats
+
+    # def pipline(self):
+    #     """学習データとテストデータに対して処理を実施して返す"""
+
+    #     self.load_dataset()
+
+    #     train_data = self.preprocessing_train(self.train_data)
+    #     test_data  = self.preprocessing_test(self.test_data)
+
+    #     # TfidfVectorizer
+    #     tr_Tfidf_tmp, te_Tfidf_tmp = self.TfidfVec_eng()
+    #     # CountVectorizer
+    #     tr_CountVec_tmp, te_CountVec_tmp = self.CountVec_eng()
+    #     # JOIN
+    #     train_data = (
+    #         train_data
+    #             .merge(tr_Tfidf_tmp, on='essay_id', how='left')
+    #             .merge(tr_CountVec_tmp, on='essay_id', how='left')
+    #         )
+    #     test_data = (
+    #         test_data
+    #             .merge(te_Tfidf_tmp, on='essay_id', how='left')
+    #             .merge(te_CountVec_tmp, on='essay_id', how='left')
+    #         )
+
+    #     return train_data, test_data
 
         

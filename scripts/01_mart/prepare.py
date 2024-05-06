@@ -3,26 +3,23 @@
 ## Imports
 import gc
 import os
+import sys
 import numpy as np
 import pandas as pd
 import random
 import polars as pl
 from data import *
+import yaml
+from utils import *
 
-## Config
-config = {
-    'sampling_mode': True,
-    'model_name': 'test',
-    'input_dir': '../data/input/',
-    'output_dir': '../data/input/middle/',
-    'target': 'score',
-    'SEED': 2018,
-    'n_splits': 15,
-}
+# 設定を読み込む
+config_path = './00_param/config.yaml'
+config = load_config(config_path)
 
 ## データ読み込み＆特徴量加工
 create_dataset = CreateDataset(config)
-train, test = create_dataset.pipline()
+train = create_dataset.preprocessing_train()
+test = create_dataset.preprocessing_test()
 
 # ディレクトリの準備
 if not os.path.exists(config['output_dir']):
@@ -32,6 +29,6 @@ if not os.path.exists(os.path.join(config['output_dir'], config['model_name'])):
 
 ## 一時保存
 train_path = os.path.join(config['output_dir'], config['model_name'], 'train_all.csv')
-pl.read_csv(train_path)
+train.to_csv(train_path, index=False)
 test_path = os.path.join(config['output_dir'], config['model_name'], 'test_all.csv')
 test.to_csv(test_path, index=False)
