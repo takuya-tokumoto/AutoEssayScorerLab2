@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+## config.yamlの読み込み
+import yaml
+with open("config.yaml", "r", encoding='utf-8') as file:
+    config = yaml.safe_load(file)
+
 ## Import
 import os
 import numpy as np
@@ -11,14 +16,19 @@ import pickle
 from sklearn.metrics import f1_score, cohen_kappa_score
 from sklearn.model_selection import StratifiedKFold
 import joblib
+from pathlib import Path
 import torch
-from utils import *
-from model import *
+# 自作関数の読み込み
+repo_dir = Path(__file__).parents[2]
+sys.path.append(str(repo_dir / "scripts/"))
+from utils.path import PathManager
+from utils.model import *
 
-## 設定値を読み込む
-config_path = '00_param/config.yaml'
-config = load_config(config_path)
+## パスの設定
+mode = config["model_name"]
+path_to = PathManager(repo_dir, mode)
 
+# モデルパラメータ
 model_params = {
     'lgbm': {
         'objective': qwk_obj,  # qwk_objは事前に定義されている関数を指定
@@ -58,7 +68,7 @@ def load_data(path):
     return pd.read_csv(path)
 
 def load_features(input_dir):
-    with open(os.path.join(input_dir, "aes2-cache/feature_select.pickle"), "rb") as f:
+    with open(input_dir, "rb") as f:
         feature_select = pickle.load(f)
 
     return feature_select
@@ -79,13 +89,14 @@ def cross_validate(config):
     for i in range(config['n_splits']):
 
         ## データの読み込み
-        train_path = os.path.join(config['output_dir'], config['model_name'], f'fold_{i}', f'train_fold.csv')
+        train_path = os.path.join(path_to.middle_files_dir, f'fold_{i}', f'train_fold.csv')
         train_data = load_data(train_path)
-        valid_path = os.path.join(config['output_dir'], config['model_name'], f'fold_{i}', f'valid_fold.csv')
+        valid_path = os.path.join(path_to.middle_files_dir, f'fold_{i}', f'valid_fold.csv')
         valid_data = load_data(valid_path)
 
         ## 特徴量の選択
-        feature_select = load_features(config['input_dir'])
+        load_path = path_to.aes2_cache_dir
+        feature_select = load_features(load_path)
         train_X, train_y, train_y_int = prepare_data(train_data, feature_select)
         valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_select)
 
@@ -96,8 +107,8 @@ def cross_validate(config):
 
         ## 学習結果を保存
         # ディレクトリの準備
-        model_path = os.path.join(config['model_weight'], config['model_name'])
-        model_fold_path = os.path.join(config['model_weight'], config['model_name'], f'fold_{i}')
+        model_path = path_to.models_weight
+        model_fold_path = os.path.join(path_to.models_weight, f'fold_{i}')
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         if not os.path.exists(model_fold_path):
@@ -120,7 +131,7 @@ def cross_validate(config):
         print(f'F1 score for fold {i}: {f1_fold}')
         print(f'Cohen kappa score for fold {i}: {kappa_fold}')
 
-    ## OOFによる評価結果
+    ## 評価結果
     mean_f1_score = np.mean(f1_scores)
     mean_kappa_score = np.mean(kappa_scores)
     print(f"Mean F1 score across {config['n_splits']} folds: {mean_f1_score}")

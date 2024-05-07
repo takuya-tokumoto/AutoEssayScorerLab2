@@ -15,34 +15,31 @@ from sklearn.metrics import cohen_kappa_score
 from lightgbm import log_evaluation, early_stopping
 import polars as pl
 import joblib
+from pathlib import Path
 import os
-import yaml
-from utils import *
-
-# 設定を読み込む
-config_path = './00_param/config.yaml'
-config = load_config(config_path)
-
+from .path import PathManager
 
 class CreateDataset():
 
-    def __init__(self, config):
+    def __init__(self, repo_dir: Path, config: dict):
         self.train_data = pl.DataFrame()
         self.test_data = pl.DataFrame()
         self.config = config
+        self.path_to = PathManager(repo_dir, config["model_name"])
 
-    def load_data(self, path, file_name):
-        """読み込みの関数"""
+    def load_data(self, path):
+        """Read用関数"""
+
         columns = [
             pl.col("full_text").str.split(by="\n\n").alias("paragraph")
         ]
-        data_path = os.path.join(path, file_name)
-        return pl.read_csv(data_path).with_columns(columns)
+        return pl.read_csv(path).with_columns(columns)
 
     def load_dataset(self):
         """データ読み込み"""
-        self.train_data = self.load_data(self.config['input_dir'], "learning-agency-lab-automated-essay-scoring-2/train.csv")
-        self.test_data = self.load_data(self.config['input_dir'], "learning-agency-lab-automated-essay-scoring-2/test.csv")
+        
+        self.train_data = self.load_data(self.path_to.origin_train_dir)
+        self.test_data = self.load_data(self.path_to.origin_test_dir)
 
         if self.config['sampling_mode']:
             self.train_data = self.train_data.sample(n=100, with_replacement=False)
@@ -51,7 +48,7 @@ class CreateDataset():
         """与えられたテキスト内(text)のスペルミスの数をカウント"""
 
         nlp = spacy.load("en_core_web_sm")
-        with open(os.path.join(self.config['input_dir'], 'english-word-hx/words.txt'), 'r') as file:
+        with open(os.path.join(self.path_to.english_word_hx_dir), 'r') as file:
             english_vocab = set(word.strip().lower() for word in file)
             
         doc = nlp(text)
@@ -324,33 +321,35 @@ class CreateDataset():
         df = train_tmp.group_by(['essay_id'], maintain_order=True).agg(aggs).sort("essay_id")
         df = df.to_pandas()
         return df
+    
+    def identity_function(self, x):
 
-    def fit_transform_TfidfVec(self, train_data): # 自分で関数化
+        return x
+
+    def fit_transform_TfidfVec(self, train_data, save_path): # 自分で関数化
         """
-        この関数は、クラス内の学習データとテストデータに対してTF-IDFベクトル化を行い、
+        この関数は、クラス内の学習データに対してTF-IDFベクトル化を行い、
         結果をDataFrame形式で返す。各DataFrameには、テキストデータがTF-IDF値に変換された特徴量列と、
         'essay_id'列が含まれる。
 
         Attributes:
             train_data (polars.DataFrame): 学習データを含むDataFrame。
                                         'full_text'と'essay_id'列が必要。
-            test_data (polars.DataFrame): テストデータを含むDataFrame。
-                                        'full_text'と'essay_id'列が必要。
 
         Returns:
             tuple: TF-IDFにより変換された特徴を含むデータフレーム。
-                - 第一要素は学習データのTF-IDF特徴量と'essay_id'を含むDataFrame。
-                - 第二要素はテストデータのTF-IDF特徴量と'essay_id'を含むDataFrame。
 
         Notes:
         - この関数はデータリークを引き起こす可能性があり、交差検証スコアが楽観的になることがあります。
         - n-gramの範囲は3から6まで、最小文書頻度は0.05、最大文書頻度は0.95です。
         """
 
+
+
         # TfidfVectorizer parameter
         vectorizer = TfidfVectorizer(
-                    tokenizer=lambda x: x,
-                    preprocessor=lambda x: x,
+                    tokenizer=self.identity_function,
+                    preprocessor=self.identity_function,
                     token_pattern=None,
                     strip_accents='unicode',
                     analyzer = 'word',
@@ -362,7 +361,7 @@ class CreateDataset():
 
         # 学習データ(train_data)の処理
         train_tfid = vectorizer.fit_transform([i for i in train_data['full_text']])
-        joblib.dump(vectorizer, os.path.join(config['output_dir'],config['model_name'],'vectorizer.pkl'))
+        joblib.dump(vectorizer, save_path)
         dense_matrix = train_tfid.toarray()
         tr_df = pd.DataFrame(dense_matrix)
         tfid_columns = [ f'tfid_{i}' for i in range(len(tr_df.columns))]
@@ -371,10 +370,21 @@ class CreateDataset():
 
         return tr_df
 
-    def transform_TfidfVec(self, test_data): # 自分で関数化    
-        
+    def transform_TfidfVec(self, test_data, save_path): # 自分で関数化    
+        """
+        この関数は、学習データでの処理をテストデータに対してもTF-IDFベクトル化を行い、
+        結果をDataFrame形式で返す。各DataFrameには、テキストデータがTF-IDF値に変換された特徴量列と、
+        'essay_id'列が含まれる。
+
+        Attributes:
+            test_data (polars.DataFrame): 学習データを含むDataFrame。
+                                        'full_text'と'essay_id'列が必要。
+
+        Returns:
+            tuple: TF-IDFにより変換された特徴を含むデータフレーム。
+        """        
         # テストデータ(test_data)の処理
-        vectorizer = joblib.load(os.path.join(config['output_dir'],config['model_name'],'vectorizer.pkl'))
+        vectorizer = joblib.load(save_path)
         test_tfid = vectorizer.transform([i for i in test_data['full_text']])
         dense_matrix = test_tfid.toarray()
         te_df = pd.DataFrame(dense_matrix)
@@ -384,28 +394,24 @@ class CreateDataset():
 
         return  te_df
 
-    def fit_transform_CountVec(self, train_data): # 自分で関数化
+    def fit_transform_CountVec(self, train_data, save_path): # 自分で関数化
         """
         与えられたデータセットからカウントベクトルを生成し、特徴データフレームとして返します。
 
         Attributes:
             train_data (polars.DataFrame): 学習データを含むDataFrame。
                                         'full_text'と'essay_id'列が必要。
-            test_data (polars.DataFrame): テストデータを含むDataFrame。
-                                        'full_text'と'essay_id'列が必要。
 
         Returns:
             DataFrame: カウントベクトルにより変換された特徴を含むデータフレーム。
-                - 第一要素は学習データのTF-IDF特徴量と'essay_id'を含むDataFrame。
-                - 第二要素はテストデータのTF-IDF特徴量と'essay_id'を含むDataFrame。
 
         注意:
         - n-gramの範囲は2から3まで、最小文書頻度は0.10、最大文書頻度は0.85です。
         """
 
         vectorizer_cnt = CountVectorizer(
-                    tokenizer=lambda x: x,
-                    preprocessor=lambda x: x,
+                    tokenizer=self.identity_function,
+                    preprocessor=self.identity_function,
                     token_pattern=None,
                     strip_accents='unicode',
                     analyzer = 'word',
@@ -416,7 +422,7 @@ class CreateDataset():
 
         ## 学習データ(train_data)の処理
         train_tfid = vectorizer_cnt.fit_transform([i for i in train_data['full_text']])
-        joblib.dump(vectorizer_cnt, os.path.join(config['output_dir'],config['model_name'],'vectorizer_cnt.pkl'))
+        joblib.dump(vectorizer_cnt, save_path)
         dense_matrix = train_tfid.toarray()
         tr_df = pd.DataFrame(dense_matrix)
         tfid_columns = [ f'tfid_cnt_{i}' for i in range(len(tr_df.columns))]
@@ -425,10 +431,22 @@ class CreateDataset():
 
         return tr_df
 
-    def transform_CountVec(self, test_data):
+    def transform_CountVec(self, test_data, save_path):
+        """
+        学習データでの処理をテストデータに対してもカウントベクトルを生成し、特徴データフレームとして返します。
 
+        Attributes:
+            train_data (polars.DataFrame): 学習データを含むDataFrame。
+                                        'full_text'と'essay_id'列が必要。
+
+        Returns:
+            DataFrame: カウントベクトルにより変換された特徴を含むデータフレーム。
+
+        注意:
+        - n-gramの範囲は2から3まで、最小文書頻度は0.10、最大文書頻度は0.85です。
+        """
         ## テストデータ(test_data)の処理
-        vectorizer_cnt = joblib.load(os.path.join(config['output_dir'],config['model_name'],'vectorizer_cnt.pkl'))
+        vectorizer_cnt = joblib.load(save_path)
         test_tfid = vectorizer_cnt.transform([i for i in test_data['full_text']])
         dense_matrix = test_tfid.toarray()
         te_df = pd.DataFrame(dense_matrix)
@@ -459,11 +477,13 @@ class CreateDataset():
         train_feats = train_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left') 
         
         # TfidfVectorizer
-        tmp = self.fit_transform_TfidfVec(self.train_data)
+        save_path = self.path_to.vectorizer_fit_dir
+        tmp = self.fit_transform_TfidfVec(self.train_data, save_path)
         train_feats = train_feats.merge(tmp, on='essay_id', how='left')
 
         # CountVectorizer
-        tmp = self.fit_transform_CountVec(self.train_data)
+        save_path = self.path_to.cnt_vectorizer_fit_dir
+        tmp = self.fit_transform_CountVec(self.train_data, save_path)
         train_feats = train_feats.merge(tmp, on='essay_id', how='left')
 
         return train_feats
@@ -486,39 +506,15 @@ class CreateDataset():
         test_feats = test_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left')
 
         # TfidfVectorizer
-        tmp = self.transform_TfidfVec(self.test_data)
+        save_path = self.path_to.vectorizer_fit_dir
+        tmp = self.transform_TfidfVec(self.test_data, save_path)
         test_feats = test_feats.merge(tmp, on='essay_id', how='left')
 
         # CountVectorizer
-        tmp = self.transform_CountVec(self.test_data)
+        save_path = self.path_to.cnt_vectorizer_fit_dir
+        tmp = self.transform_CountVec(self.test_data, save_path)
         test_feats = test_feats.merge(tmp, on='essay_id', how='left')
 
         return test_feats
-
-    # def pipline(self):
-    #     """学習データとテストデータに対して処理を実施して返す"""
-
-    #     self.load_dataset()
-
-    #     train_data = self.preprocessing_train(self.train_data)
-    #     test_data  = self.preprocessing_test(self.test_data)
-
-    #     # TfidfVectorizer
-    #     tr_Tfidf_tmp, te_Tfidf_tmp = self.TfidfVec_eng()
-    #     # CountVectorizer
-    #     tr_CountVec_tmp, te_CountVec_tmp = self.CountVec_eng()
-    #     # JOIN
-    #     train_data = (
-    #         train_data
-    #             .merge(tr_Tfidf_tmp, on='essay_id', how='left')
-    #             .merge(tr_CountVec_tmp, on='essay_id', how='left')
-    #         )
-    #     test_data = (
-    #         test_data
-    #             .merge(te_Tfidf_tmp, on='essay_id', how='left')
-    #             .merge(te_CountVec_tmp, on='essay_id', how='left')
-    #         )
-
-    #     return train_data, test_data
 
         

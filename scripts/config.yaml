@@ -1,0 +1,8 @@
+
+sampling_mode: False
+model_name: test
+target: score
+SEED: 2018
+n_splits: 15
+a: 2.998
+b: 1.092

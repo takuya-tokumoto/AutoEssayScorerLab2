@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+## config.yamlの読み込み
+import yaml
+with open("config.yaml", "r", encoding='utf-8') as file:
+    config = yaml.safe_load(file)
+
 ## Import
 import os
 import numpy as np
@@ -13,10 +18,11 @@ from utils import *
 import torch
 import joblib
 
-
+## 関数
 def quadratic_weighted_kappa(y_true, y_pred):
     """
-    二次加重カッパ（QWK: Quadratic Weighted Kappa）を計算する関数です。これは二人の評価者が与えた離散的な数値スコア間の一致度を測る指標で、
+    二次加重カッパ（QWK: Quadratic Weighted Kappa）を計算する関数です。
+    これは二人の評価者が与えた離散的な数値スコア間の一致度を測る指標で、
     設定パラメータ 'a' を基にスコアを調整し、XGBoostおよびLightGBMモデルの予測値を異なる方法で処理します。
 
     Args:
@@ -62,15 +68,16 @@ def qwk_obj(y_true, y_pred):
     """
     カスタム損失関数として動作し、勾配ブースティングモデル（特にXGBoostやLightGBM）で使用するための勾配とヘッセ行列を計算します。
     この関数は、モデルの予測値と実際の値に基づいて、予測誤差の勾配とヘッセ行列を求め、モデルの学習プロセスで使用します。
-    具体的には、設定されたパラメータ 'a' と 'b' を使用して予測値とラベルを調整し、その後、損失関数に基づいて勾配とヘッセ行列を導出します。
+    具体的には、設定されたパラメータ 'a' と 'b' を使用して予測値とラベルを調整し、
+    その後、損失関数に基づいて勾配とヘッセ行列を導出します。
 
     Args:
         y_true (np.array): 実際のラベルの配列。
         y_pred (np.array): モデルによって出力された予測値の配列。
 
     Returns:
-        tuple: 勾配の配列とヘッセ行列の配列を含むタプル。これにより、モデルの学習アルゴリズムが
-               パラメータを効果的に更新できるようにします。
+        勾配の配列とヘッセ行列の配列を含むタプル。これにより、モデルの学習アルゴリズムが
+        パラメータを効果的に更新できるようにします。
 
     Note:
         1. 実際のラベルと予測値に config から取得した 'a' の値を加算して調整します。
@@ -91,7 +98,7 @@ def qwk_obj(y_true, y_pred):
 
     return grad, hess
 
-
+## モデル用クラス
 class Trainer:
     def __init__(self, config, model_params):
         self.config = config
@@ -143,10 +150,9 @@ class Trainer:
         self.xgb_regressor.save_model(os.path.join(save_path, 'xgb_model.json'))
 
     def load_weight(self, save_path):
-        """モデルの学習結果をロード"""
+        """モデルの重みをロード"""
         
-        # self.light.load_model(os.path.join(save_path, 'lgbm_model.json'))
-        self.light = joblib.load(os.path.join(load_path, 'lgbm_model.pkl'))
+        self.light = joblib.load(os.path.join(save_path, 'lgbm_model.pkl'))
         self.xgb_regressor.load_model(os.path.join(save_path, 'xgb_model.json'))
     
     def predict(self, X):

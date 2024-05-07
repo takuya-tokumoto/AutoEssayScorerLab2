@@ -1,34 +1,40 @@
 # -*- encoding: utf-8 -*-
 
-## Imports
+## config.yamlの読み込み
+import yaml
+with open("config.yaml", "r", encoding='utf-8') as file:
+    config = yaml.safe_load(file)
+
+## Import
 import gc
 import os
 import sys
 import numpy as np
 import pandas as pd
 import random
+from pathlib import Path
 import polars as pl
-from data import *
-import yaml
-from utils import *
+# 自作関数の読み込み
+repo_dir = Path(__file__).parents[2]
+sys.path.append(str(repo_dir / "scripts/"))
+from utils.path import PathManager
+from utils.data import *
 
-# 設定を読み込む
-config_path = './00_param/config.yaml'
-config = load_config(config_path)
+## パスの設定
+mode = config["model_name"]
+path_to = PathManager(repo_dir, mode)
+
+## ディレクトリ作成
+if not os.path.exists(path_to.middle_files_dir):
+    path_to.middle_files_dir.mkdir()
 
 ## データ読み込み＆特徴量加工
-create_dataset = CreateDataset(config)
+create_dataset = CreateDataset(repo_dir, config)
 train = create_dataset.preprocessing_train()
 test = create_dataset.preprocessing_test()
 
-# ディレクトリの準備
-if not os.path.exists(config['output_dir']):
-    os.mkdir(config['output_dir'])
-if not os.path.exists(os.path.join(config['output_dir'], config['model_name'])):
-    os.mkdir(os.path.join(config['output_dir'], config['model_name']))
-
-## 一時保存
-train_path = os.path.join(config['output_dir'], config['model_name'], 'train_all.csv')
-train.to_csv(train_path, index=False)
-test_path = os.path.join(config['output_dir'], config['model_name'], 'test_all.csv')
-test.to_csv(test_path, index=False)
+## 保存
+save_path = path_to.train_all_mart_dir
+train.to_csv(save_path, index=False)
+save_path = path_to.test_all_mart_dir
+test.to_csv(save_path, index=False)

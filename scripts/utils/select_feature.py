@@ -1,5 +1,3 @@
-
-
 def feature_select_wrapper():
     """
     データセットを使用して特徴量選択を行う関数。LightGBMの回帰モデルを利用し、
