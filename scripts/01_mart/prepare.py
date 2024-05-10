@@ -16,20 +16,22 @@ from pathlib import Path
 import polars as pl
 # 自作関数の読み込み
 repo_dir = Path(__file__).parents[2]
+root_dir = Path(__file__).parents[3]
+s3_dir = root_dir / "s3storage/01_public/auto_essay_scorer_lab2/"
 sys.path.append(str(repo_dir / "scripts/"))
 from utils.path import PathManager
 from utils.data import *
 
 ## パスの設定
 mode = config["model_name"]
-path_to = PathManager(repo_dir, mode)
+path_to = PathManager(s3_dir, mode)
 
 ## ディレクトリ作成
 if not os.path.exists(path_to.middle_files_dir):
     path_to.middle_files_dir.mkdir()
 
 ## データ読み込み＆特徴量加工
-create_dataset = CreateDataset(repo_dir, config)
+create_dataset = CreateDataset(s3_dir, config)
 train = create_dataset.preprocessing_train()
 test = create_dataset.preprocessing_test()
 

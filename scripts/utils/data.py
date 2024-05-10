@@ -27,6 +27,8 @@ class CreateDataset():
         self.config = config
         self.path_to = PathManager(repo_dir, config["model_name"])
 
+        print(repo_dir)
+
     def load_data(self, path):
         """Read用関数"""
 
