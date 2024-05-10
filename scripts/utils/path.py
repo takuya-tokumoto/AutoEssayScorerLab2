@@ -28,7 +28,9 @@ class PathManager:
             self.input_dir / "aes2-cache/feature_select.pickle"
         )    
 
-        ## input/middle/{mode}/
+        # input/middle/
+        self.mid_dir: Path = self.input_dir / "middle/"
+        # input/middle/{mode}/
         self.middle_files_dir: Path = self.input_dir / "middle/" f"{mode}/"
         # TfidfVectorizerの重み
         self.vectorizer_fit_dir: Path = self.middle_files_dir / 'vectorizer.pkl'

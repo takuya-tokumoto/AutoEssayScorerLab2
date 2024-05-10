@@ -26,8 +26,8 @@ class CreateDataset():
         self.test_data = pl.DataFrame()
         self.config = config
         self.path_to = PathManager(repo_dir, config["model_name"])
-
-        print(repo_dir)
+        self.nlp = spacy.load("en_core_web_sm")
+        self.english_vocab = self.load_english_vocab() 
 
     def load_data(self, path):
         """Read用関数"""
@@ -45,17 +45,20 @@ class CreateDataset():
 
         if self.config['sampling_mode']:
             self.train_data = self.train_data.sample(n=100, with_replacement=False)
+
+    def load_english_vocab(self):
+        """英語語彙セット(english-word-hx)を読み込み"""
+
+        vocab_path = self.path_to.english_word_hx_dir
+        with open(vocab_path, 'r') as file:
+            return set(word.strip().lower() for word in file)
     
     def count_spelling_errors(self, text):
         """与えられたテキスト内(text)のスペルミスの数をカウント"""
-
-        nlp = spacy.load("en_core_web_sm")
-        with open(os.path.join(self.path_to.english_word_hx_dir), 'r') as file:
-            english_vocab = set(word.strip().lower() for word in file)
             
-        doc = nlp(text)
+        doc = self.nlp(text)
         lemmatized_tokens = [token.lemma_.lower() for token in doc]
-        spelling_errors = sum(1 for token in lemmatized_tokens if token not in english_vocab)
+        spelling_errors = sum(1 for token in lemmatized_tokens if token not in self.english_vocab)
         return spelling_errors
 
     def removeHTML(self, x):
@@ -345,9 +348,7 @@ class CreateDataset():
         - この関数はデータリークを引き起こす可能性があり、交差検証スコアが楽観的になることがあります。
         - n-gramの範囲は3から6まで、最小文書頻度は0.05、最大文書頻度は0.95です。
         """
-
-
-
+        
         # TfidfVectorizer parameter
         vectorizer = TfidfVectorizer(
                     tokenizer=self.identity_function,
@@ -466,6 +467,7 @@ class CreateDataset():
         # Paragraph
         tmp = self.Paragraph_Preprocess(self.train_data)
         train_feats = self.Paragraph_Eng(tmp)
+        print('---Paragraph 特徴量作成完了---')
 
         # Score
         train_feats['score'] = self.train_data['score']
@@ -473,20 +475,25 @@ class CreateDataset():
         # Sentence
         tmp = self.Sentence_Preprocess(self.train_data)
         train_feats = train_feats.merge(self.Sentence_Eng(tmp), on='essay_id', how='left')
+        print('---Sentence 特徴量作成完了---')
 
         # Word
         tmp = self.Word_Preprocess(self.train_data)
         train_feats = train_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left') 
+        print('---Word 特徴量作成完了---')
         
         # TfidfVectorizer
         save_path = self.path_to.vectorizer_fit_dir
         tmp = self.fit_transform_TfidfVec(self.train_data, save_path)
         train_feats = train_feats.merge(tmp, on='essay_id', how='left')
+        print('---TfidfVectorizer 特徴量作成完了---')
 
         # CountVectorizer
         save_path = self.path_to.cnt_vectorizer_fit_dir
         tmp = self.fit_transform_CountVec(self.train_data, save_path)
         train_feats = train_feats.merge(tmp, on='essay_id', how='left')
+        print('---CountVectorizer 特徴量作成完了---')
+        print('--trainデータ作成完了')
 
         return train_feats
 
@@ -498,24 +505,30 @@ class CreateDataset():
         # Paragraph
         tmp = self.Paragraph_Preprocess(self.test_data)
         test_feats = self.Paragraph_Eng(tmp)
+        print('---Paragraph 特徴量作成完了---')
 
         # Sentence
         tmp = self.Sentence_Preprocess(self.test_data)
         test_feats = test_feats.merge(self.Sentence_Eng(tmp), on='essay_id', how='left')
+        print('---Sentence 特徴量作成完了---')
 
         # Word
         tmp = self.Word_Preprocess(self.test_data)
         test_feats = test_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left')
+        print('---Word 特徴量作成完了---')
 
         # TfidfVectorizer
         save_path = self.path_to.vectorizer_fit_dir
         tmp = self.transform_TfidfVec(self.test_data, save_path)
         test_feats = test_feats.merge(tmp, on='essay_id', how='left')
+        print('---TfidfVectorizer 特徴量作成完了---')
 
         # CountVectorizer
         save_path = self.path_to.cnt_vectorizer_fit_dir
         tmp = self.transform_CountVec(self.test_data, save_path)
         test_feats = test_feats.merge(tmp, on='essay_id', how='left')
+        print('---CountVectorizer 特徴量作成完了---')
+        print('--testデータ作成完了')
 
         return test_feats
 

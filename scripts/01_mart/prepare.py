@@ -27,6 +27,8 @@ mode = config["model_name"]
 path_to = PathManager(s3_dir, mode)
 
 ## ディレクトリ作成
+if not os.path.exists(path_to.mid_dir):
+    path_to.mid_dir.mkdir()
 if not os.path.exists(path_to.middle_files_dir):
     path_to.middle_files_dir.mkdir()
 

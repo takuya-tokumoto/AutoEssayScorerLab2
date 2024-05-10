@@ -20,13 +20,15 @@ from pathlib import Path
 import torch
 # 自作関数の読み込み
 repo_dir = Path(__file__).parents[2]
+root_dir = Path(__file__).parents[3]
+s3_dir = root_dir / "s3storage/01_public/auto_essay_scorer_lab2/"
 sys.path.append(str(repo_dir / "scripts/"))
 from utils.path import PathManager
 from utils.model import *
 
 ## パスの設定
 mode = config["model_name"]
-path_to = PathManager(repo_dir, mode)
+path_to = PathManager(s3_dir, mode)
 
 # モデルパラメータ
 model_params = {
