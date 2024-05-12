@@ -1,4 +1,6 @@
-def feature_select_wrapper():
+
+
+def feature_select_wrapper(X, y_split):
     """
     データセットを使用して特徴量選択を行う関数。LightGBMの回帰モデルを利用し、
     Stratified K-Foldでデータを分割して、各foldでのモデルの性能を評価します。最終的には
@@ -21,8 +23,11 @@ def feature_select_wrapper():
           引数として受け取るように調整する必要があります。
     """
 
+    models = []
+    
     # Part 1.
     print('feature_select_wrapper...')
+    feature_names = list(filter(lambda x: x not in ['essay_id','score'], train_feats.columns))
     features = feature_names
 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
@@ -54,6 +59,7 @@ def feature_select_wrapper():
                               eval_set=[(X_train_fold, y_train_fold), (X_test_fold, y_test_fold)],
                               eval_metric=quadratic_weighted_kappa,
                               callbacks=callbacks)
+        
         models.append(predictor)
         predictions_fold = predictor.predict(X_test_fold)
         predictions_fold = predictions_fold + a
@@ -65,18 +71,10 @@ def feature_select_wrapper():
         kappa_fold = cohen_kappa_score(y_test_fold_int, predictions_fold, weights='quadratic')
         kappa_scores.append(kappa_fold)
 
-#         cm = confusion_matrix(y_test_fold_int, predictions_fold, labels=[x for x in range(1,7)])
-
-#         disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-#                                       display_labels=[x for x in range(1,7)])
-#         disp.plot()
-#         plt.show()
         print(f'F1 score across fold: {f1_fold}')
         print(f'Cohen kappa score across fold: {kappa_fold}')
 
         fse += pd.Series(predictor.feature_importances_, features)
-        if ENABLE_DONT_WASTE_YOUR_RUN_TIME:
-            break
     
     # Part 4.
     feature_select = fse.sort_values(ascending=False).index.tolist()[:13000]

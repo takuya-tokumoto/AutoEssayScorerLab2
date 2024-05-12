@@ -76,7 +76,7 @@ def load_features(input_dir):
     return feature_select
 
 def prepare_data(input_data, feature_select):
-    feature_select = [feature for feature in feature_select if feature in input_data.columns]
+    # feature_select = [feature for feature in feature_select if feature in input_data.columns]
     X = input_data[feature_select].astype(np.float32).values
     y = input_data[config['target']].astype(np.float32).values - config['a']
     y_int = input_data[config['target']].astype(int).values
@@ -99,6 +99,7 @@ def cross_validate(config):
         ## 特徴量の選択
         load_path = path_to.aes2_cache_dir
         feature_select = load_features(load_path)
+
         train_X, train_y, train_y_int = prepare_data(train_data, feature_select)
         valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_select)
 

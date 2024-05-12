@@ -14,9 +14,20 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
 from sklearn.metrics import cohen_kappa_score
 from lightgbm import log_evaluation, early_stopping
 import polars as pl
+import torch
 import joblib
 from pathlib import Path
+from scipy.special import softmax
 import os
+from transformers import (
+    AutoTokenizer, 
+    AutoModelForSequenceClassification, 
+    Trainer, 
+    TrainingArguments, 
+    DataCollatorWithPadding
+)
+from datasets import Dataset
+from glob import glob
 from .path import PathManager
 
 class CreateDataset():
@@ -458,6 +469,71 @@ class CreateDataset():
         te_df['essay_id'] = test_data['essay_id']
 
         return te_df
+    
+    def load_deberta_preds_feats(self):
+        """事前に作成済みのdebertaの予測値を読み込み"""
+
+        deberta_oof = joblib.load(self.path_to.deberta_model_oof_dir)
+
+        return deberta_oof
+    
+    def deberta_oof_scores(self, input_data):
+        """学習済みモデルを用いて予測スコアを計算する"""
+
+        def load_tokenizer_and_models():
+            """トークナイザーとモデルを読み込む"""
+
+            models = glob(str(self.path_to.pretrain_deberta_model_dir))
+            tokenizer = AutoTokenizer.from_pretrained(models[0])
+            return tokenizer, models
+        
+        def tokenize_data(tokenizer, input_data):
+            """入力データをトークナイズする"""
+
+            def tokenize(sample):
+                return tokenizer(sample['full_text'], max_length=self.config["MAX_LENGTH"], truncation=True)
+
+            ds = Dataset.from_pandas(input_data.to_pandas())
+            ds = ds.map(tokenize).remove_columns(['essay_id', 'full_text'])
+
+            return ds
+        
+        def predict_scores(models, tokenizer, ds):
+            """予測スコアを計算する"""
+
+            args = TrainingArguments(
+                ".", 
+                per_device_eval_batch_size=self.config["EVAL_BATCH_SIZE"], 
+                report_to="none"
+            )
+            
+            predictions = []
+            for model_path in models:
+                model = AutoModelForSequenceClassification.from_pretrained(model_path)
+                trainer = Trainer(
+                    model=model, 
+                    args=args, 
+                    data_collator=DataCollatorWithPadding(tokenizer), 
+                    tokenizer=tokenizer
+                )
+                preds = trainer.predict(ds).predictions
+                predictions.append(softmax(preds, axis=-1))
+                del model, trainer
+                torch.cuda.empty_cache()
+                gc.collect()
+
+            predicted_score = 0.
+            for p in predictions:
+                predicted_score += p    
+            predicted_score /= len(predictions)
+
+            return predicted_score
+        
+        tokenizer, models = load_tokenizer_and_models()
+        ds = tokenize_data(tokenizer, input_data)
+        predicted_score = predict_scores(models, tokenizer, ds)
+
+        return predicted_score
 
     def preprocessing_train(self):
         """学習データ(train_data)に対して一連の処理を実行"""
@@ -493,7 +569,15 @@ class CreateDataset():
         tmp = self.fit_transform_CountVec(self.train_data, save_path)
         train_feats = train_feats.merge(tmp, on='essay_id', how='left')
         print('---CountVectorizer 特徴量作成完了---')
-        print('--trainデータ作成完了')
+
+        # Debertaモデルの予測値
+        predicted_score = self.load_deberta_preds_feats()
+        # predicted_score = self.deberta_oof_scores(self.train_data)
+        for i in range(6):
+            train_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
+        print('---Debertaモデル予測値 特徴量作成完了---')
+
+        print('■ trainデータ作成完了')
 
         return train_feats
 
@@ -528,7 +612,14 @@ class CreateDataset():
         tmp = self.transform_CountVec(self.test_data, save_path)
         test_feats = test_feats.merge(tmp, on='essay_id', how='left')
         print('---CountVectorizer 特徴量作成完了---')
-        print('--testデータ作成完了')
+
+        # Debertaモデルの予測値
+        predicted_score = self.deberta_oof_scores(self.test_data)
+        for i in range(6):
+            test_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
+        print('---Debertaモデル予測値 特徴量作成完了---')
+
+        print('■ testデータ作成完了')
 
         return test_feats
 

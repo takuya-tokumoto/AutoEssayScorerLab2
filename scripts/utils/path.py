@@ -25,11 +25,18 @@ class PathManager:
         self.english_word_hx_dir: Path = (
             self.input_dir / "english-word-hx/words.txt"
         )       
-        # aes2-cache
+        # aes2-preprocessing
         self.aes2_cache_dir: Path = (
-            self.input_dir / "aes2-cache/feature_select.pickle"
+            self.input_dir / "aes2-preprocessing/feature_select.pickle"
         )    
-
+        # aes2-400-20240419134941/*/*
+        self.pretrain_deberta_model_dir: Path = (
+            self.input_dir / "aes2-400-20240419134941/*/*"
+        )            
+        # aes2-400-20240419134941/oof.pkl
+        self.deberta_model_oof_dir: Path = (
+            self.input_dir / "aes2-400-20240419134941/oof.pkl"
+        )     
         ### input/train_logs_{mode}/
         self.train_logs_dir: Path = self.input_dir / f"train-logs-{mode}/"
         ## input/train_logs_{mode}/vectorize_weight/

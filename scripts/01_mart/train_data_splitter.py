@@ -38,6 +38,7 @@ if not os.path.exists(path_to.middle_mart_dir):
 ## 読み込み
 load_path = path_to.train_all_mart_dir
 train_data = pl.read_csv(load_path)
+
 # 目的変数を分割して準備
 X = train_data.drop(config['target'])
 y = train_data[config['target']]
