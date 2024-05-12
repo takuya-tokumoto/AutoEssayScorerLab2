@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-## config.yamlの読み込み
-import yaml
-with open("config.yaml", "r", encoding='utf-8') as file:
-    config = yaml.safe_load(file)
+## Setting
+a_value = 2.998
+b_value = 1.092
 
 ## Import
 import os
@@ -47,20 +46,19 @@ def quadratic_weighted_kappa(y_true, y_pred):
         ('QWK', 0.88, True)
     """
 
-
     if isinstance(y_pred, xgb.QuantileDMatrix):
         # XGB
         y_true, y_pred = y_pred, y_true
 
-        y_true = (y_true.get_label() + config['a']).round()
-        y_pred = (y_pred + config['a']).clip(1, 6).round()
+        y_true = (y_true.get_label() + a_value).round()
+        y_pred = (y_pred + a_value).clip(1, 6).round()
         qwk = cohen_kappa_score(y_true, y_pred, weights="quadratic")
         return 'QWK', qwk
 
     else:
         # For lgb
-        y_true = y_true + config['a']
-        y_pred = (y_pred + config['a']).clip(1, 6).round()
+        y_true = y_true + a_value
+        y_pred = (y_pred + a_value).clip(1, 6).round()
         qwk = cohen_kappa_score(y_true, y_pred, weights="quadratic")
         return 'QWK', qwk, True
 
@@ -86,13 +84,13 @@ def qwk_obj(y_true, y_pred):
         4. 損失関数から勾配 'grad' とヘッセ行列 'hess' を計算し、これらをモデルの学習プロセスに返します。
     """
 
-    labels = y_true + config['a']
-    preds = y_pred + config['a']
+    labels = y_true + a_value
+    preds = y_pred + a_value
     preds = preds.clip(1, 6)
     f = 1/2*np.sum((preds-labels)**2)
-    g = 1/2*np.sum((preds-config['a'])**2 + config['b'])
+    g = 1/2*np.sum((preds-a_value)**2 + b_value)
     df = preds - labels
-    dg = preds - config['a']
+    dg = preds - a_value
     grad = (df/g - f*dg/g**2)*len(labels)
     hess = np.ones(len(labels))
 
@@ -159,7 +157,9 @@ class Trainer:
         """予測結果を出力"""
 
         predicted = None
-        predicted = 0.76*self.light.predict(X)
-        predicted += 0.24*self.xgb_regressor.predict(X)
+        predicted = (
+            0.76*self.light.predict(X)
+            + 0.24*self.xgb_regressor.predict(X)
+        )
 
         return predicted

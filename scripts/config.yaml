@@ -1,6 +1,6 @@
 
 sampling_mode: False
-model_name: test
+model_name: 202405112310-init
 target: score
 SEED: 2018
 n_splits: 15

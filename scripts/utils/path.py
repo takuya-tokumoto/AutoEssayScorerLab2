@@ -1,5 +1,7 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 from pathlib import Path
-import yaml
 
 
 class PathManager:
@@ -7,8 +9,8 @@ class PathManager:
 
     def __init__(self, repo_dir: Path, mode: str) -> None:
         
-        ## input/
-        self.input_dir: Path = repo_dir / "data/input/"
+        #### input/
+        self.input_dir: Path = repo_dir / "input/"
         # オリジナルのコンペデータ
         self.origin_train_dir: Path = (
             self.input_dir / "learning-agency-lab-automated-essay-scoring-2/train.csv"
@@ -28,29 +30,30 @@ class PathManager:
             self.input_dir / "aes2-cache/feature_select.pickle"
         )    
 
-        # input/middle/
-        self.mid_dir: Path = self.input_dir / "middle/"
-        # input/middle/{mode}/
-        self.middle_files_dir: Path = self.input_dir / "middle/" f"{mode}/"
+        ### input/train_logs_{mode}/
+        self.train_logs_dir: Path = self.input_dir / f"train-logs-{mode}/"
+        ## input/train_logs_{mode}/vectorize_weight/
+        self.vectorizer_weight_dir: Path = self.train_logs_dir / f"vectorizer-weight/"
         # TfidfVectorizerの重み
-        self.vectorizer_fit_dir: Path = self.middle_files_dir / 'vectorizer.pkl'
+        self.vectorizer_fit_dir: Path = self.vectorizer_weight_dir / 'vectorizer.pkl'
         # CountVectorizerの重み
-        self.cnt_vectorizer_fit_dir: Path = self.middle_files_dir / 'vectorizer_cnt.pkl'
+        self.cnt_vectorizer_fit_dir: Path = self.vectorizer_weight_dir / 'vectorizer_cnt.pkl'
+        ## モデルの重み：input/train_logs_{mode}/ens_model_weight/
+        self.models_weight_dir: Path = self.train_logs_dir / "ens-model-weight/"
+
+        ### input/middle_mart_{mode}/
+        self.middle_mart_dir: Path = self.input_dir / f"middle-mart-{mode}/"
         # 特徴量付きのデータフレーム
         self.train_all_mart_dir: Path = (
-            self.middle_files_dir / "train_all.csv"
+            self.middle_mart_dir / "train_all.csv"
         )
         self.test_all_mart_dir: Path = (
-            self.middle_files_dir / "test_all.csv"
+            self.middle_mart_dir / "test_all.csv"
         )
 
-        ## models/{mode}/
-        # モデルの重み
-        self.models_weight: Path = repo_dir / "models/" f"{mode}/"
-
-        ## data/output/
-        self.output_dir: Path = repo_dir / "data/output/"
-        # submitファイル
+        #### output/
+        self.output_dir: Path = repo_dir / "output/"
+        ### submitファイル
         self.submit_dir: Path = self.output_dir / "submit.csv"
 
 
