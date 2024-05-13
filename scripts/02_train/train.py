@@ -39,10 +39,10 @@ model_params = {
         'max_depth': 5,
         'num_leaves': 10,
         'colsample_bytree': 0.3,
-        'reg_alpha': 2.,
+        'reg_alpha': 0.7,
         'reg_lambda': 0.1,
         'n_estimators': 700,
-        'random_state': 42,
+        'random_state': 412,
         'extra_trees': True,
         'class_weight': 'balanced',
         'device': 'gpu' if torch.cuda.is_available() else 'cpu',
@@ -96,19 +96,6 @@ def cross_validate(config):
         valid_path = os.path.join(path_to.middle_mart_dir, f'fold_{i}', f'valid_fold.csv')
         valid_data = load_data(valid_path)
 
-        ## 特徴量の選択
-        load_path = path_to.aes2_cache_dir
-        feature_select = load_features(load_path)
-
-        train_X, train_y, train_y_int = prepare_data(train_data, feature_select)
-        valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_select)
-
-        ## 学習実施
-        trainer = Trainer(config, model_params)
-        trainer.initialize_models()
-        trainer.train(train_X, train_y, valid_X, valid_y)
-
-        ## 学習結果を保存
         # ディレクトリの準備
         model_path = path_to.models_weight_dir
         model_fold_path = os.path.join(path_to.models_weight_dir, f'fold_{i}')
@@ -116,7 +103,33 @@ def cross_validate(config):
             os.mkdir(model_path)
         if not os.path.exists(model_fold_path):
             os.mkdir(model_fold_path)
-        # モデルの保存
+        
+        ### 特徴量の絞り込み計算
+        ## データ準備
+        feature_all = list(filter(lambda x: x not in ['essay_id','score'], train_data.columns))
+        train_X, train_y, train_y_int = prepare_data(train_data, feature_all)
+        valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_all)
+        ## テスト学習
+        trainer_all = Trainer(config, model_params)
+        trainer_all.initialize_models()
+        trainer_all.train(train_X, train_y, valid_X, valid_y)
+        ## 変数重要度を取得
+        fse = pd.Series(trainer_all.light.feature_importances_, feature_all)
+        feature_select = fse.sort_values(ascending=False).index.tolist()[:13000]
+        save_path = os.path.join(model_fold_path, 'feature_select.pickle')
+        ## feature_select リストを pickle ファイルとして保存
+        with open(save_path, 'wb') as f:
+            pickle.dump(feature_select, f)
+
+        ### 特徴量を絞り込んだうえでモデル学習
+        ## データ準備
+        train_X, train_y, train_y_int = prepare_data(train_data, feature_select)
+        valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_select)
+        ## 学習
+        trainer = Trainer(config, model_params)
+        trainer.initialize_models()
+        trainer.train(train_X, train_y, valid_X, valid_y)
+        ## 学習結果を保存
         trainer.save_weight(model_fold_path)
 
         ## 学習結果を評価

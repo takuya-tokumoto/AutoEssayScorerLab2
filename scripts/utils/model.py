@@ -113,7 +113,7 @@ class Trainer:
         except KeyError as e:
             print(f"Error initializing models: {e}")
             raise
-
+    
     def train(self, X_train, y_train, X_valid, y_valid):
         """モデルの学習"""
 
