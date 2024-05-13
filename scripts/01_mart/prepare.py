@@ -27,14 +27,9 @@ mode = config["model_name"]
 path_to = PathManager(s3_dir, mode)
 
 ## ディレクトリ作成
-if not os.path.exists(path_to.input_dir):
-    path_to.input_dir.mkdir()
-if not os.path.exists(path_to.middle_mart_dir):
-    path_to.middle_mart_dir.mkdir()
-if not os.path.exists(path_to.train_logs_dir):
-    path_to.train_logs_dir.mkdir()
-if not os.path.exists(path_to.vectorizer_weight_dir):
-    path_to.vectorizer_weight_dir.mkdir()
+path_to.middle_mart_dir.mkdir(parents=True, exist_ok=True)
+path_to.train_logs_dir.mkdir(parents=True, exist_ok=True)
+path_to.vectorizer_weight_dir.mkdir(parents=True, exist_ok=True)
 
 ## データ読み込み＆特徴量加工
 create_dataset = CreateDataset(s3_dir, config)

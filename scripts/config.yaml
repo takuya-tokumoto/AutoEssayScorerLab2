@@ -4,7 +4,7 @@ model_name: 202405121745-deberta
 target: score
 SEED: 2018
 n_splits: 15
-a: 2.998
-b: 1.092
+avg_train_score: 2.998
+var_train_score: 1.092
 MAX_LENGTH: 1024
 EVAL_BATCH_SIZE: 1

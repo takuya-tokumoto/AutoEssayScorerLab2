@@ -10,7 +10,6 @@ with open("config.yaml", "r", encoding='utf-8') as file:
 import os
 import numpy as np
 import pandas as pd
-import polars as pl
 import sys
 import pickle
 from sklearn.metrics import f1_score, cohen_kappa_score
@@ -67,16 +66,13 @@ model_params = {
 }
 
 def load_data(path):
+    """データ読み込み"""
+
     return pd.read_csv(path)
 
-def load_features(input_dir):
-    with open(input_dir, "rb") as f:
-        feature_select = pickle.load(f)
-
-    return feature_select
-
 def prepare_data(input_data, feature_select):
-    # feature_select = [feature for feature in feature_select if feature in input_data.columns]
+    """データを指定の変数で絞りこんだうえで学習データ(X, y, y_int)を作成"""
+
     X = input_data[feature_select].astype(np.float32).values
     y = input_data[config['target']].astype(np.float32).values - config['a']
     y_int = input_data[config['target']].astype(int).values
@@ -91,18 +87,14 @@ def cross_validate(config):
     for i in range(config['n_splits']):
 
         ## データの読み込み
-        train_path = os.path.join(path_to.middle_mart_dir, f'fold_{i}', f'train_fold.csv')
+        train_path: Path = path_to.middle_mart_dir / f'fold_{i}/train_fold.csv'
         train_data = load_data(train_path)
-        valid_path = os.path.join(path_to.middle_mart_dir, f'fold_{i}', f'valid_fold.csv')
+        valid_path: Path = path_to.middle_mart_dir / f'fold_{i}/valid_fold.csv'
         valid_data = load_data(valid_path)
 
         # ディレクトリの準備
-        model_path = path_to.models_weight_dir
-        model_fold_path = os.path.join(path_to.models_weight_dir, f'fold_{i}')
-        if not os.path.exists(model_path):
-            os.mkdir(model_path)
-        if not os.path.exists(model_fold_path):
-            os.mkdir(model_fold_path)
+        model_fold_path: Path = path_to.models_weight_dir / 'fold_{i}/'
+        model_fold_path.mkdir(parents=True, exist_ok=True)
         
         ### 特徴量の絞り込み計算
         ## データ準備
@@ -116,9 +108,8 @@ def cross_validate(config):
         ## 変数重要度を取得
         fse = pd.Series(trainer_all.light.feature_importances_, feature_all)
         feature_select = fse.sort_values(ascending=False).index.tolist()[:13000]
-        save_path = os.path.join(model_fold_path, 'feature_select.pickle')
         ## feature_select リストを pickle ファイルとして保存
-        with open(save_path, 'wb') as f:
+        with open(model_fold_path / 'feature_select.pickle', 'wb') as f:
             pickle.dump(feature_select, f)
 
         ### 特徴量を絞り込んだうえでモデル学習
