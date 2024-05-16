@@ -3,16 +3,14 @@
 
 ## config.yamlの読み込み
 import yaml
-with open("config.yaml", "r", encoding='utf-8') as file:
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(current_dir, '..', 'config.yaml')
+with open(config_path, "r", encoding='utf-8') as file:
     config = yaml.safe_load(file)
 
 ## Import
-import gc
 import os
-import numpy as np
-import pandas as pd
-import random
-import pickle
 import sys
 import polars as pl
 from pathlib import Path

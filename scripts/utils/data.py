@@ -570,12 +570,12 @@ class CreateDataset():
         train_feats = train_feats.merge(tmp, on='essay_id', how='left')
         print('---CountVectorizer 特徴量作成完了---')
 
-        # Debertaモデルの予測値
-        predicted_score = self.load_deberta_preds_feats()
-        # predicted_score = self.deberta_oof_scores(self.train_data)
-        for i in range(6):
-            train_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
-        print('---Debertaモデル予測値 特徴量作成完了---')
+        # # Debertaモデルの予測値
+        # predicted_score = self.load_deberta_preds_feats()
+        # # predicted_score = self.deberta_oof_scores(self.train_data)
+        # for i in range(6):
+        #     train_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
+        # print('---Debertaモデル予測値 特徴量作成完了---')
 
         print('■ trainデータ作成完了')
 
@@ -613,11 +613,11 @@ class CreateDataset():
         test_feats = test_feats.merge(tmp, on='essay_id', how='left')
         print('---CountVectorizer 特徴量作成完了---')
 
-        # Debertaモデルの予測値
-        predicted_score = self.deberta_oof_scores(self.test_data)
-        for i in range(6):
-            test_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
-        print('---Debertaモデル予測値 特徴量作成完了---')
+        # # Debertaモデルの予測値
+        # predicted_score = self.deberta_oof_scores(self.test_data)
+        # for i in range(6):
+        #     test_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
+        # print('---Debertaモデル予測値 特徴量作成完了---')
 
         print('■ testデータ作成完了')
 
