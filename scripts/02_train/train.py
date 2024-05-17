@@ -34,7 +34,7 @@ path_to = PathManager(s3_dir, mode)
 # モデルパラメータ
 model_params = {
     'lgbm': {
-        'objective': qwk_obj,  # `utils.model.py`定義されている関数を指定
+        'objective': qwk_obj,  # `utils/model.py`定義されている関数を指定
         'metrics': 'None',
         'learning_rate': 0.05,
         'max_depth': 5,
@@ -50,7 +50,7 @@ model_params = {
         'verbosity': - 1
     },
     'xgb': {
-        'objective': qwk_obj,  # `utils.model.py`定義されている関数を指定
+        'objective': qwk_obj,  # `utils/model.py`定義されている関数を指定
         'metrics': 'None',
         'learning_rate': 0.1,
         'max_depth': 5,
@@ -98,26 +98,26 @@ def cross_validate(config):
         model_fold_path: Path = path_to.models_weight_dir / f'fold_{i}/'
         model_fold_path.mkdir(parents=True, exist_ok=True)
         
-        ### 特徴量の絞り込み計算 -> 変数重要度上位13,000件をピックアップ
-        # ## データ準備
-        # feature_all = list(filter(lambda x: x not in ['essay_id','score'], train_data.columns))
-        # train_X, train_y, train_y_int = prepare_data(train_data, feature_all)
-        # valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_all)
-        # ## 全特徴量含めて学習
-        # trainer_all = Trainer(config, model_params)
-        # trainer_all.initialize_models()
-        # trainer_all.train(train_X, train_y, valid_X, valid_y)
-        # ## 変数重要度を取得
-        # fse = pd.Series(trainer_all.light.feature_importances_, feature_all)
-        # feature_select = fse.sort_values(ascending=False).index.tolist()[:13000]
-        # ## feature_select リストを pickle ファイルとして保存
-        # with open(model_fold_path / 'feature_select.pickle', 'wb') as f:
-        #     pickle.dump(feature_select, f)
+        ## 特徴量の絞り込み計算 -> 変数重要度上位13,000件をピックアップ
+        ## データ準備
+        feature_all = list(filter(lambda x: x not in ['essay_id','score'], train_data.columns))
+        train_X, train_y, train_y_int = prepare_data(train_data, feature_all)
+        valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_all)
+        ## 全特徴量含めて学習
+        trainer_all = Trainer(config, model_params)
+        trainer_all.initialize_models()
+        trainer_all.train(train_X, train_y, valid_X, valid_y)
+        ## 変数重要度を取得
+        fse = pd.Series(trainer_all.light.feature_importances_, feature_all)
+        feature_select = fse.sort_values(ascending=False).index.tolist()[:13000]
+        ## feature_select リストを pickle ファイルとして保存
+        with open(model_fold_path / 'feature_select.pickle', 'wb') as f:
+            pickle.dump(feature_select, f)
         
-        # pickle ファイルから feature_select リストを読み込む
-        save_path = os.path.join(path_to.models_weight_dir / 'feature_select.pickle')
-        with open(save_path, 'rb') as f:
-            feature_select = pickle.load(f)
+        # # pickle ファイルから feature_select リストを読み込む
+        # save_path = os.path.join(path_to.models_weight_dir / 'feature_select.pickle')
+        # with open(save_path, 'rb') as f:
+        #     feature_select = pickle.load(f)
 
         ### 特徴量を絞り込んだうえでモデル学習
         ## データ準備

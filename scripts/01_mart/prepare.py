@@ -21,22 +21,25 @@ sys.path.append(str(repo_dir / "scripts/"))
 from utils.path import PathManager
 from utils.data import CreateDataset
 
-## パスの設定
-mode = config["model_name"]
-path_to = PathManager(s3_dir, mode)
 
-## ディレクトリ作成
-path_to.middle_mart_dir.mkdir(parents=True, exist_ok=True)
-path_to.train_logs_dir.mkdir(parents=True, exist_ok=True)
-path_to.vectorizer_weight_dir.mkdir(parents=True, exist_ok=True)
+if __name__ == '__main__':
 
-## データ読み込み＆特徴量加工
-create_dataset = CreateDataset(s3_dir, config)
-train = create_dataset.preprocessing_train()
-test = create_dataset.preprocessing_test()
+    ## パスの設定
+    mode = config["model_name"]
+    path_to = PathManager(s3_dir, mode)
 
-## 保存
-save_path = path_to.train_all_mart_dir
-train.to_csv(save_path, index=False)
-save_path = path_to.test_all_mart_dir
-test.to_csv(save_path, index=False)
+    ## ディレクトリ作成
+    path_to.middle_mart_dir.mkdir(parents=True, exist_ok=True)
+    path_to.train_logs_dir.mkdir(parents=True, exist_ok=True)
+    path_to.vectorizer_weight_dir.mkdir(parents=True, exist_ok=True)
+
+    ## データ読み込み＆特徴量加工
+    create_dataset = CreateDataset(s3_dir, config)
+    train = create_dataset.preprocessing_train()
+    # test = create_dataset.preprocessing_test()
+
+    ## 保存
+    save_path = path_to.train_all_mart_dir
+    train.to_csv(save_path, index=False)
+    # save_path = path_to.test_all_mart_dir
+    # test.to_csv(save_path, index=False)
