@@ -7,12 +7,8 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import re
 import spacy
 import string
-import random
 from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer, HashingVectorizer
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
-from sklearn.metrics import cohen_kappa_score
-from lightgbm import log_evaluation, early_stopping
 import polars as pl
 import torch
 import joblib
@@ -28,6 +24,7 @@ from transformers import (
 )
 from datasets import Dataset
 from glob import glob
+# 自作関数の読み込み
 from .path import PathManager
 
 class CreateDataset():
@@ -192,6 +189,8 @@ class CreateDataset():
             # Count the number of paragraph lengths greater than and less than the i-value
             *[pl.col('paragraph').filter(pl.col('paragraph_len') >= i).count().alias(f"paragraph_>{i}_cnt") for i in [0, 50,75,100,125,150,175,200,250,300,350,400,500,600,700] ], 
             *[pl.col('paragraph').filter(pl.col('paragraph_len') <= i).count().alias(f"paragraph_<{i}_cnt") for i in [25,49]], 
+            # *[pl.col('paragraph').filter(pl.col('paragraph_len') >= i).count().alias(f"paragraph_{i}_cnt") for i in [0, 50,75,100,125,150,175,200,250,300,350,400,500,600,700] ], 
+            # *[pl.col('paragraph').filter(pl.col('paragraph_len') <= i).count().alias(f"paragraph_{i}_cnt") for i in [25,49]], 
             # other
             *[pl.col(fea).max().alias(f"{fea}_max") for fea in paragraph_fea2],
             *[pl.col(fea).mean().alias(f"{fea}_mean") for fea in paragraph_fea2],
@@ -264,6 +263,8 @@ class CreateDataset():
             # Count the number of sentences with a length greater than i
             *[pl.col('sentence').filter(pl.col('sentence_len') >= i).count().alias(f"sentence_>{i}_cnt") for i in [0,15,50,100,150,200,250,300] ], 
             *[pl.col('sentence').filter(pl.col('sentence_len') <= i).count().alias(f"sentence_<{i}_cnt") for i in [15,50] ], 
+            # *[pl.col('sentence').filter(pl.col('sentence_len') >= i).count().alias(f"sentence_{i}_cnt") for i in [0,15,50,100,150,200,250,300] ], 
+            # *[pl.col('sentence').filter(pl.col('sentence_len') <= i).count().alias(f"sentence_<{i}_cnt") for i in [15,50] ], 
             # other
             *[pl.col(fea).max().alias(f"{fea}_max") for fea in sentence_fea],
             *[pl.col(fea).mean().alias(f"{fea}_mean") for fea in sentence_fea],
@@ -351,6 +352,7 @@ class CreateDataset():
         Attributes:
             train_data (polars.DataFrame): 学習データを含むDataFrame。
                                         'full_text'と'essay_id'列が必要。
+            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
 
         Returns:
             tuple: TF-IDFにより変換された特徴を含むデータフレーム。
@@ -393,6 +395,7 @@ class CreateDataset():
         Attributes:
             test_data (polars.DataFrame): 学習データを含むDataFrame。
                                         'full_text'と'essay_id'列が必要。
+            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
 
         Returns:
             tuple: TF-IDFにより変換された特徴を含むデータフレーム。
@@ -415,6 +418,7 @@ class CreateDataset():
         Attributes:
             train_data (polars.DataFrame): 学習データを含むDataFrame。
                                         'full_text'と'essay_id'列が必要。
+            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
 
         Returns:
             DataFrame: カウントベクトルにより変換された特徴を含むデータフレーム。
@@ -452,6 +456,7 @@ class CreateDataset():
         Attributes:
             train_data (polars.DataFrame): 学習データを含むDataFrame。
                                         'full_text'と'essay_id'列が必要。
+            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
 
         Returns:
             DataFrame: カウントベクトルにより変換された特徴を含むデータフレーム。
@@ -488,7 +493,7 @@ class CreateDataset():
             return tokenizer, models
         
         def tokenize_data(tokenizer, input_data):
-            """入力データをトークナイズする"""
+            """入力データをトークン化"""
 
             def tokenize(sample):
                 return tokenizer(sample['full_text'], max_length=self.config["MAX_LENGTH"], truncation=True)
@@ -499,7 +504,7 @@ class CreateDataset():
             return ds
         
         def predict_scores(models, tokenizer, ds):
-            """予測スコアを計算する"""
+            """予測スコアを計算"""
 
             args = TrainingArguments(
                 ".", 

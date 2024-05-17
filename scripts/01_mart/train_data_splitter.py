@@ -3,16 +3,14 @@
 
 ## config.yamlの読み込み
 import yaml
-with open("config.yaml", "r", encoding='utf-8') as file:
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(current_dir, '..', 'config.yaml')
+with open(config_path, "r", encoding='utf-8') as file:
     config = yaml.safe_load(file)
 
 ## Import
-import gc
 import os
-import numpy as np
-import pandas as pd
-import random
-import pickle
 import sys
 import polars as pl
 from pathlib import Path
@@ -25,35 +23,33 @@ sys.path.append(str(repo_dir / "scripts/"))
 from utils.path import PathManager
 from utils.data import *
 
-## パスの設定
-mode = config["model_name"]
-path_to = PathManager(s3_dir, mode)
 
-## ディレクトリの準備
-if not os.path.exists(path_to.input_dir):
-    path_to.input_dir.mkdir()
-if not os.path.exists(path_to.middle_mart_dir):
-    path_to.middle_mart_dir.mkdir()
+if __name__ == '__main__':
+    
+    ## パスの設定
+    mode = config["model_name"]
+    path_to = PathManager(s3_dir, mode)
 
-## 読み込み
-load_path = path_to.train_all_mart_dir
-train_data = pl.read_csv(load_path)
+    ## 学習データ用意
+    load_path = path_to.train_all_mart_dir
+    train_data = pl.read_csv(load_path)
+    # 目的変数と説明変数を分割
+    X = train_data.drop(config['target'])
+    y = train_data[config['target']]
 
-# 目的変数を分割して準備
-X = train_data.drop(config['target'])
-y = train_data[config['target']]
+    ## fold別に分割して保存
+    skf = StratifiedKFold(n_splits=config['n_splits'], shuffle=True, random_state=config['SEED'])
+    for i, (train_index, valid_index) in enumerate(skf.split(X.to_pandas(), y.to_pandas())):
+        print('fold', i)
+        train_fold_df = train_data[train_index]
+        valid_fold_df = train_data[valid_index]
 
-## fold別に分割して保存
-skf = StratifiedKFold(n_splits=config['n_splits'], shuffle=True, random_state=config['SEED'])
-for i, (train_index, valid_index) in enumerate(skf.split(X.to_pandas(), y.to_pandas())):
-    print('fold', i)
-    train_fold_df = train_data[train_index]
-    valid_fold_df = train_data[valid_index]
+        # ディレクトリ作成    
+        base_fold_dir: Path = path_to.middle_mart_dir / f'fold_{i}/'
+        base_fold_dir.mkdir(parents=True, exist_ok=True)
 
-    # ディレクトリ作成    
-    if not os.path.exists(os.path.join(path_to.middle_mart_dir, f'fold_{i}')):
-        os.mkdir(os.path.join(path_to.middle_mart_dir, f'fold_{i}'))
-
-    # CSVファイルとして保存
-    train_fold_df.write_csv(os.path.join(path_to.middle_mart_dir, f'fold_{i}', f'train_fold.csv'))
-    valid_fold_df.write_csv(os.path.join(path_to.middle_mart_dir, f'fold_{i}', f'valid_fold.csv'))
+        # CSVファイルとして保存
+        train_fold_save_dir: Path = base_fold_dir / 'train_fold.csv'
+        train_fold_df.write_csv(train_fold_save_dir)
+        valid_fold_save_dir: Path = base_fold_dir / 'valid_fold.csv'
+        valid_fold_df.write_csv(valid_fold_save_dir)

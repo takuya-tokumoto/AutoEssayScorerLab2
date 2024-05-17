@@ -3,12 +3,11 @@
 
 from pathlib import Path
 
-
 class PathManager:
     """ディレクトリパスおよびファイルパスを保持する。"""
 
     def __init__(self, repo_dir: Path, mode: str) -> None:
-        
+
         #### input/
         self.input_dir: Path = repo_dir / "input/"
         # オリジナルのコンペデータ
