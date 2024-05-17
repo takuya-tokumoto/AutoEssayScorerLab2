@@ -15,8 +15,8 @@ import lightgbm as lgb
 from lightgbm import log_evaluation, early_stopping
 import xgboost as xgb
 from sklearn.metrics import cohen_kappa_score
-from utils import *
 import joblib
+# 自作関数の読み込み
 from .qwk import quadratic_weighted_kappa, qwk_obj
 
 ## モデル用クラス

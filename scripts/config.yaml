@@ -1,6 +1,6 @@
 
-sampling_mode: True 
-model_name: 202405162345-deberta
+sampling_mode: False 
+model_name: 202405170826-refact
 target: score
 SEED: 2018
 n_splits: 15
