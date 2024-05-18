@@ -197,7 +197,7 @@ def cross_validate(config):
 
 if __name__ == '__main__':
 
-    logger.info(f'【条件： {mode} 】実行開始')
+    logger.info(f'【条件： {mode}】実行開始')
     cross_validate(config)
 
-    logger.info(f'【条件： {mode} 】実行完了')
+    logger.info(f'実行完了')
