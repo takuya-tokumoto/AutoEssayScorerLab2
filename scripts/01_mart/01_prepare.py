@@ -36,10 +36,7 @@ if __name__ == '__main__':
     ## データ読み込み＆特徴量加工
     create_dataset = CreateDataset(s3_dir, config)
     train = create_dataset.preprocessing_train()
-    # test = create_dataset.preprocessing_test()
 
     ## 保存
     save_path = path_to.train_all_mart_dir
     train.to_csv(save_path, index=False)
-    # save_path = path_to.test_all_mart_dir
-    # test.to_csv(save_path, index=False)

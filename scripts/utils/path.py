@@ -40,15 +40,17 @@ class PathManager:
         self.train_logs_dir: Path = self.input_dir / f"train-logs-{mode}/"
         ## input/train_logs_{mode}/vectorize_weight/
         self.vectorizer_weight_dir: Path = self.train_logs_dir / f"vectorizer-weight/"
-        # TfidfVectorizerの重み
-        self.vectorizer_fit_dir: Path = self.vectorizer_weight_dir / 'vectorizer.pkl'
-        # CountVectorizerの重み
-        self.cnt_vectorizer_fit_dir: Path = self.vectorizer_weight_dir / 'vectorizer_cnt.pkl'
         ## モデルの重み：input/train_logs_{mode}/ens_model_weight/
         self.models_weight_dir: Path = self.train_logs_dir / "ens-model-weight/"
+        ## ログファイル：input/train_logs_{mode}/ens_model_weight/training.log
+        self.log_file_dir: Path = self.models_weight_dir / "training.log"
 
         ### input/middle_mart_{mode}/
         self.middle_mart_dir: Path = self.input_dir / f"middle-mart-{mode}/"
+        ## input/middle_mart_{mode}/stratifiedkfold/
+        self.skf_mart_dir: Path = self.middle_mart_dir / f"stratifiedkfold/"
+        ## input/middle_mart_{mode}/add_metafeats/
+        self.add_meta_mart_dir: Path = self.middle_mart_dir / f"add_metafeats/"
         # 特徴量付きのデータフレーム
         self.train_all_mart_dir: Path = (
             self.middle_mart_dir / "train_all.csv"

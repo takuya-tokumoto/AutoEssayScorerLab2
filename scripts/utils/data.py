@@ -1,4 +1,5 @@
-# -*- encoding : utf-8 -*-
+#!/usr/bin/env python
+# coding: utf-8
 
 ## Import
 import gc
@@ -7,8 +8,6 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import re
 import spacy
 import string
-from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer, HashingVectorizer
-import matplotlib.pyplot as plt
 import polars as pl
 import torch
 import joblib
@@ -189,8 +188,6 @@ class CreateDataset():
             # Count the number of paragraph lengths greater than and less than the i-value
             *[pl.col('paragraph').filter(pl.col('paragraph_len') >= i).count().alias(f"paragraph_>{i}_cnt") for i in [0, 50,75,100,125,150,175,200,250,300,350,400,500,600,700] ], 
             *[pl.col('paragraph').filter(pl.col('paragraph_len') <= i).count().alias(f"paragraph_<{i}_cnt") for i in [25,49]], 
-            # *[pl.col('paragraph').filter(pl.col('paragraph_len') >= i).count().alias(f"paragraph_{i}_cnt") for i in [0, 50,75,100,125,150,175,200,250,300,350,400,500,600,700] ], 
-            # *[pl.col('paragraph').filter(pl.col('paragraph_len') <= i).count().alias(f"paragraph_{i}_cnt") for i in [25,49]], 
             # other
             *[pl.col(fea).max().alias(f"{fea}_max") for fea in paragraph_fea2],
             *[pl.col(fea).mean().alias(f"{fea}_mean") for fea in paragraph_fea2],
@@ -263,8 +260,6 @@ class CreateDataset():
             # Count the number of sentences with a length greater than i
             *[pl.col('sentence').filter(pl.col('sentence_len') >= i).count().alias(f"sentence_>{i}_cnt") for i in [0,15,50,100,150,200,250,300] ], 
             *[pl.col('sentence').filter(pl.col('sentence_len') <= i).count().alias(f"sentence_<{i}_cnt") for i in [15,50] ], 
-            # *[pl.col('sentence').filter(pl.col('sentence_len') >= i).count().alias(f"sentence_{i}_cnt") for i in [0,15,50,100,150,200,250,300] ], 
-            # *[pl.col('sentence').filter(pl.col('sentence_len') <= i).count().alias(f"sentence_<{i}_cnt") for i in [15,50] ], 
             # other
             *[pl.col(fea).max().alias(f"{fea}_max") for fea in sentence_fea],
             *[pl.col(fea).mean().alias(f"{fea}_mean") for fea in sentence_fea],
@@ -338,142 +333,6 @@ class CreateDataset():
         df = train_tmp.group_by(['essay_id'], maintain_order=True).agg(aggs).sort("essay_id")
         df = df.to_pandas()
         return df
-    
-    def identity_function(self, x):
-
-        return x
-
-    def fit_transform_TfidfVec(self, train_data, save_path): # 自分で関数化
-        """
-        この関数は、クラス内の学習データに対してTF-IDFベクトル化を行い、
-        結果をDataFrame形式で返す。各DataFrameには、テキストデータがTF-IDF値に変換された特徴量列と、
-        'essay_id'列が含まれる。
-
-        Attributes:
-            train_data (polars.DataFrame): 学習データを含むDataFrame。
-                                        'full_text'と'essay_id'列が必要。
-            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
-
-        Returns:
-            tuple: TF-IDFにより変換された特徴を含むデータフレーム。
-
-        Notes:
-        - この関数はデータリークを引き起こす可能性があり、交差検証スコアが楽観的になることがあります。
-        - n-gramの範囲は3から6まで、最小文書頻度は0.05、最大文書頻度は0.95です。
-        """
-        
-        # TfidfVectorizer parameter
-        vectorizer = TfidfVectorizer(
-                    tokenizer=self.identity_function,
-                    preprocessor=self.identity_function,
-                    token_pattern=None,
-                    strip_accents='unicode',
-                    analyzer = 'word',
-                    ngram_range=(3,6),
-                    min_df=0.05,
-                    max_df=0.95,
-                    sublinear_tf=True,
-        )
-
-        # 学習データ(train_data)の処理
-        train_tfid = vectorizer.fit_transform([i for i in train_data['full_text']])
-        joblib.dump(vectorizer, save_path)
-        dense_matrix = train_tfid.toarray()
-        tr_df = pd.DataFrame(dense_matrix)
-        tfid_columns = [ f'tfid_{i}' for i in range(len(tr_df.columns))]
-        tr_df.columns = tfid_columns
-        tr_df['essay_id'] = train_data['essay_id']
-
-        return tr_df
-
-    def transform_TfidfVec(self, test_data, save_path): # 自分で関数化    
-        """
-        この関数は、学習データでの処理をテストデータに対してもTF-IDFベクトル化を行い、
-        結果をDataFrame形式で返す。各DataFrameには、テキストデータがTF-IDF値に変換された特徴量列と、
-        'essay_id'列が含まれる。
-
-        Attributes:
-            test_data (polars.DataFrame): 学習データを含むDataFrame。
-                                        'full_text'と'essay_id'列が必要。
-            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
-
-        Returns:
-            tuple: TF-IDFにより変換された特徴を含むデータフレーム。
-        """        
-        # テストデータ(test_data)の処理
-        vectorizer = joblib.load(save_path)
-        test_tfid = vectorizer.transform([i for i in test_data['full_text']])
-        dense_matrix = test_tfid.toarray()
-        te_df = pd.DataFrame(dense_matrix)
-        tfid_columns = [ f'tfid_{i}' for i in range(len(te_df.columns))]
-        te_df.columns = tfid_columns
-        te_df['essay_id'] = test_data['essay_id']
-
-        return  te_df
-
-    def fit_transform_CountVec(self, train_data, save_path): # 自分で関数化
-        """
-        与えられたデータセットからカウントベクトルを生成し、特徴データフレームとして返します。
-
-        Attributes:
-            train_data (polars.DataFrame): 学習データを含むDataFrame。
-                                        'full_text'と'essay_id'列が必要。
-            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
-
-        Returns:
-            DataFrame: カウントベクトルにより変換された特徴を含むデータフレーム。
-
-        注意:
-        - n-gramの範囲は2から3まで、最小文書頻度は0.10、最大文書頻度は0.85です。
-        """
-
-        vectorizer_cnt = CountVectorizer(
-                    tokenizer=self.identity_function,
-                    preprocessor=self.identity_function,
-                    token_pattern=None,
-                    strip_accents='unicode',
-                    analyzer = 'word',
-                    ngram_range=(2,3),
-                    min_df=0.10,
-                    max_df=0.85,
-        )
-
-        ## 学習データ(train_data)の処理
-        train_tfid = vectorizer_cnt.fit_transform([i for i in train_data['full_text']])
-        joblib.dump(vectorizer_cnt, save_path)
-        dense_matrix = train_tfid.toarray()
-        tr_df = pd.DataFrame(dense_matrix)
-        tfid_columns = [ f'tfid_cnt_{i}' for i in range(len(tr_df.columns))]
-        tr_df.columns = tfid_columns
-        tr_df['essay_id'] = train_data['essay_id']
-
-        return tr_df
-
-    def transform_CountVec(self, test_data, save_path):
-        """
-        学習データでの処理をテストデータに対してもカウントベクトルを生成し、特徴データフレームとして返します。
-
-        Attributes:
-            train_data (polars.DataFrame): 学習データを含むDataFrame。
-                                        'full_text'と'essay_id'列が必要。
-            save_path (pathlib.Path): ベクトル化の重みの保存先パス。
-
-        Returns:
-            DataFrame: カウントベクトルにより変換された特徴を含むデータフレーム。
-
-        注意:
-        - n-gramの範囲は2から3まで、最小文書頻度は0.10、最大文書頻度は0.85です。
-        """
-        ## テストデータ(test_data)の処理
-        vectorizer_cnt = joblib.load(save_path)
-        test_tfid = vectorizer_cnt.transform([i for i in test_data['full_text']])
-        dense_matrix = test_tfid.toarray()
-        te_df = pd.DataFrame(dense_matrix)
-        tfid_columns = [ f'tfid_cnt_{i}' for i in range(len(te_df.columns))]
-        te_df.columns = tfid_columns
-        te_df['essay_id'] = test_data['essay_id']
-
-        return te_df
     
     def load_deberta_preds_feats(self):
         """事前に作成済みのdebertaの予測値を読み込み"""
@@ -552,6 +411,8 @@ class CreateDataset():
 
         # Score
         train_feats['score'] = self.train_data['score']
+        # full_text -> 後の処理で必要なので付与 ※決定木モデルには直接投入しないよう注意
+        train_feats['full_text'] = self.train_data['full_text']
 
         # Sentence
         tmp = self.Sentence_Preprocess(self.train_data)
@@ -562,25 +423,13 @@ class CreateDataset():
         tmp = self.Word_Preprocess(self.train_data)
         train_feats = train_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left') 
         print('---Word 特徴量作成完了---')
-        
-        # TfidfVectorizer
-        save_path = self.path_to.vectorizer_fit_dir
-        tmp = self.fit_transform_TfidfVec(self.train_data, save_path)
-        train_feats = train_feats.merge(tmp, on='essay_id', how='left')
-        print('---TfidfVectorizer 特徴量作成完了---')
 
-        # CountVectorizer
-        save_path = self.path_to.cnt_vectorizer_fit_dir
-        tmp = self.fit_transform_CountVec(self.train_data, save_path)
-        train_feats = train_feats.merge(tmp, on='essay_id', how='left')
-        print('---CountVectorizer 特徴量作成完了---')
-
-        # Debertaモデルの予測値
-        predicted_score = self.load_deberta_preds_feats()
-        # predicted_score = self.deberta_oof_scores(self.train_data)
-        for i in range(6):
-            train_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
-        print('---Debertaモデル予測値 特徴量作成完了---')
+        # # Debertaモデルの予測値
+        # predicted_score = self.load_deberta_preds_feats()
+        # # predicted_score = self.deberta_oof_scores(self.train_data)
+        # for i in range(6):
+        #     train_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
+        # print('---Debertaモデル予測値 特徴量作成完了---')
 
         print('■ trainデータ作成完了')
 
@@ -596,6 +445,9 @@ class CreateDataset():
         test_feats = self.Paragraph_Eng(tmp)
         print('---Paragraph 特徴量作成完了---')
 
+        # full_text -> 後の処理で必要なので付与 ※決定木モデルには直接投入しないよう注意
+        test_feats['full_text'] = self.test_data['full_text']
+
         # Sentence
         tmp = self.Sentence_Preprocess(self.test_data)
         test_feats = test_feats.merge(self.Sentence_Eng(tmp), on='essay_id', how='left')
@@ -606,23 +458,11 @@ class CreateDataset():
         test_feats = test_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left')
         print('---Word 特徴量作成完了---')
 
-        # TfidfVectorizer
-        save_path = self.path_to.vectorizer_fit_dir
-        tmp = self.transform_TfidfVec(self.test_data, save_path)
-        test_feats = test_feats.merge(tmp, on='essay_id', how='left')
-        print('---TfidfVectorizer 特徴量作成完了---')
-
-        # CountVectorizer
-        save_path = self.path_to.cnt_vectorizer_fit_dir
-        tmp = self.transform_CountVec(self.test_data, save_path)
-        test_feats = test_feats.merge(tmp, on='essay_id', how='left')
-        print('---CountVectorizer 特徴量作成完了---')
-
-        # Debertaモデルの予測値
-        predicted_score = self.deberta_oof_scores(self.test_data)
-        for i in range(6):
-            test_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
-        print('---Debertaモデル予測値 特徴量作成完了---')
+        # # Debertaモデルの予測値
+        # predicted_score = self.deberta_oof_scores(self.test_data)
+        # for i in range(6):
+        #     test_feats[f'deberta_oof_{i}'] = predicted_score[:, i]
+        # print('---Debertaモデル予測値 特徴量作成完了---')
 
         print('■ testデータ作成完了')
 

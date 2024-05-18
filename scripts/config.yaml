@@ -1,6 +1,6 @@
 
-sampling_mode: False 
-model_name: 202405171158-after-refact
+sampling_mode: True 
+model_name: 202405182324-fold-tfidf-test
 target: score
 SEED: 2018
 n_splits: 15

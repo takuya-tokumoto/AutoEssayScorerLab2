@@ -21,8 +21,6 @@ root_dir = Path(__file__).parents[3]
 s3_dir = root_dir / "s3storage/01_public/auto_essay_scorer_lab2/data/"
 sys.path.append(str(repo_dir / "scripts/"))
 from utils.path import PathManager
-from utils.data import *
-
 
 if __name__ == '__main__':
     
@@ -40,12 +38,14 @@ if __name__ == '__main__':
     ## fold別に分割して保存
     skf = StratifiedKFold(n_splits=config['n_splits'], shuffle=True, random_state=config['SEED'])
     for i, (train_index, valid_index) in enumerate(skf.split(X.to_pandas(), y.to_pandas())):
-        print('fold', i)
+        fold_num = str(i)
+        print('fold', fold_num)
+
         train_fold_df = train_data[train_index]
         valid_fold_df = train_data[valid_index]
 
         # ディレクトリ作成    
-        base_fold_dir: Path = path_to.middle_mart_dir / f'fold_{i}/'
+        base_fold_dir: Path = path_to.skf_mart_dir / f'fold_{fold_num}/'
         base_fold_dir.mkdir(parents=True, exist_ok=True)
 
         # CSVファイルとして保存
