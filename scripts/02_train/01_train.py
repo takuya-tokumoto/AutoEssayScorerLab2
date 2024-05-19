@@ -15,9 +15,12 @@ import numpy as np
 import pandas as pd
 import sys
 import pickle
+import time
+from datetime import datetime, timedelta, timezone
 from sklearn.metrics import f1_score, cohen_kappa_score
 from pathlib import Path
 import torch
+import logging
 # 自作関数の読み込み
 repo_dir = Path(__file__).parents[2]
 root_dir = Path(__file__).parents[3]
@@ -30,6 +33,40 @@ from utils.qwk import quadratic_weighted_kappa, qwk_obj
 ## パスの設定
 mode = config["model_name"]
 path_to = PathManager(s3_dir, mode)
+
+## ディレクトリの準備
+path_to.models_weight_dir.mkdir(parents=True, exist_ok=True)
+
+## ロギングの設定
+# JSTタイムゾーンを定義
+JST = timezone(timedelta(hours=+9), 'JST')
+# ロギングフォーマッタの拡張クラス
+class JSTFormatter(logging.Formatter):
+    def converter(self, timestamp):
+        dt = datetime.fromtimestamp(timestamp, tz=JST)
+        return dt.timetuple()
+
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, tz=JST)
+        if datefmt:
+            s = dt.strftime(datefmt)
+        else:
+            try:
+                s = dt.isoformat(timespec='milliseconds')
+            except TypeError:
+                s = dt.isoformat()
+        return s
+# loggerの取得
+logger = logging.getLogger()
+# 既存のハンドラをクリア
+if logger.hasHandlers():
+    logger.handlers.clear()
+# 新しいハンドラを設定
+handler = logging.FileHandler("training.log")
+handler.setLevel(logging.INFO)
+formatter = JSTFormatter('%(asctime)s:%(levelname)s:%(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 # モデルパラメータ
 model_params = {
@@ -85,13 +122,14 @@ def cross_validate(config):
     f1_scores = []
     kappa_scores = []
     predictions = []
+    actual_labels = []
     
     for i in range(config['n_splits']):
 
         ## データの読み込み
-        train_path: Path = path_to.middle_mart_dir / f'fold_{i}/train_fold.csv'
+        train_path: Path = path_to.add_meta_mart_dir / f'fold_{i}/train_fold_add_meta.csv'
         train_data = load_data(train_path)
-        valid_path: Path = path_to.middle_mart_dir / f'fold_{i}/valid_fold.csv'
+        valid_path: Path = path_to.add_meta_mart_dir / f'fold_{i}/valid_fold_add_meta.csv'
         valid_data = load_data(valid_path)
 
         # ディレクトリの準備
@@ -113,16 +151,14 @@ def cross_validate(config):
         ## feature_select リストを pickle ファイルとして保存
         with open(model_fold_path / 'feature_select.pickle', 'wb') as f:
             pickle.dump(feature_select, f)
-        
-        # # pickle ファイルから feature_select リストを読み込む
-        # save_path = os.path.join(path_to.models_weight_dir / 'feature_select.pickle')
-        # with open(save_path, 'rb') as f:
-        #     feature_select = pickle.load(f)
 
         ### 特徴量を絞り込んだうえでモデル学習
         ## データ準備
         train_X, train_y, train_y_int = prepare_data(train_data, feature_select)
         valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_select)
+        # 正解データを格納
+        actual_labels.extend(valid_y_int)
+
         ## 学習
         trainer = Trainer(config, model_params)
         trainer.initialize_models()
@@ -134,7 +170,9 @@ def cross_validate(config):
         predictions_fold = trainer.predict(valid_X)
         predictions_fold = predictions_fold + config['avg_train_score']
         predictions_fold = np.clip(predictions_fold, 1, 6).round()
-        predictions.append(predictions_fold)
+        # 予測結果を格納
+        predictions.extend(predictions_fold)
+
         # F1スコア
         f1_fold = f1_score(valid_y_int, predictions_fold, average='weighted')
         f1_scores.append(f1_fold)
@@ -142,14 +180,24 @@ def cross_validate(config):
         kappa_fold = cohen_kappa_score(valid_y_int, predictions_fold, weights='quadratic')
         kappa_scores.append(kappa_fold)
 
-        print(f'F1 score for fold {i}: {f1_fold}')
-        print(f'Cohen kappa score for fold {i}: {kappa_fold}')
+        logger.info(f'F1 score for fold {i}: {f1_fold}')
+        logger.info(f'Cohen kappa score for fold {i}: {kappa_fold}')
 
     ## 評価結果
+    # 各foldの平均評価を算出
     mean_f1_score = np.mean(f1_scores)
     mean_kappa_score = np.mean(kappa_scores)
-    print(f"Mean F1 score across {config['n_splits']} folds: {mean_f1_score}")
-    print(f"Mean Cohen kappa score across {config['n_splits']} folds: {mean_kappa_score}")
+    logger.info(f"Mean F1 score across {config['n_splits']} folds: {mean_f1_score}")
+    logger.info(f"Mean Cohen kappa score across {config['n_splits']} folds: {mean_kappa_score}")
+    # OOFでの評価結果を算出
+    oof_f1_score = f1_score(actual_labels, predictions, average='weighted')
+    oof_kappa_score = cohen_kappa_score(actual_labels, predictions, weights='quadratic')
+    logger.info(f"Out-Of-Fold F1 score: {oof_f1_score}")
+    logger.info(f"Out-Of-Fold Cohen kappa score: {oof_kappa_score}")    
 
 if __name__ == '__main__':
+
+    logger.info(f'【条件： {mode}】実行開始')
     cross_validate(config)
+
+    logger.info(f'実行完了')
