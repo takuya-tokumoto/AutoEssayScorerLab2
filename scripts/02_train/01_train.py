@@ -144,7 +144,7 @@ def cross_validate(config):
         ## 全特徴量含めて学習
         trainer_all = Trainer(config, model_params)
         trainer_all.initialize_models()
-        trainer_all.train(train_X, train_y, valid_X, valid_y)
+        trainer_all.train(train_X, train_y)
         ## 変数重要度を取得
         fse = pd.Series(trainer_all.light.feature_importances_, feature_all)
         feature_select = fse.sort_values(ascending=False).index.tolist()[:13000]
@@ -162,7 +162,13 @@ def cross_validate(config):
         ## 学習
         trainer = Trainer(config, model_params)
         trainer.initialize_models()
-        trainer.train(train_X, train_y, valid_X, valid_y)
+        # イテレーション回数の最適化
+        trainer.train_with_early_stopping(train_X, train_y)
+        logger.info(f'For fold {i}, the optimal number of iterations for LightGBM is {trainer.best_light_iteration}.')
+        logger.info(f'For fold {i}, the optimal number of iterations for XGBoost is {trainer.best_xgb_iteration}.')
+        # 本番
+        trainer.train(train_X, train_y)
+
         ## 学習結果を保存
         trainer.save_weight(model_fold_path)
 

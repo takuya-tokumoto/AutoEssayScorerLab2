@@ -1,6 +1,6 @@
 
-sampling_mode: False 
-model_name: 202405182350-fold-tfidf
+sampling_mode: True 
+model_name: 202405191655-tuning-iters-test
 target: score
 SEED: 2018
 n_splits: 15
