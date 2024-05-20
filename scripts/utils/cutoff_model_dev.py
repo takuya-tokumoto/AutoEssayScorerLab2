@@ -16,9 +16,8 @@ from lightgbm import log_evaluation, early_stopping
 from sklearn.model_selection import train_test_split
 import xgboost as xgb
 from sklearn.metrics import cohen_kappa_score
+from catboost import CatBoostRegressor, CatBoostClassifier
 import joblib
-# 自作関数の読み込み
-from .qwk import quadratic_weighted_kappa, qwk_obj
 
 ## モデル用クラス
 class Trainer:
@@ -34,8 +33,8 @@ class Trainer:
         """モデルの初期化"""
 
         try:
-            self.light = lgb.LGBMRegressor(**self.model_params['lgbm'])
-            self.xgb_regressor = xgb.XGBRegressor(**self.model_params['xgb'])
+            self.cat_classify = lgb.CatBoostClassifier(**self.model_params['xx'])
+            self.light_classify = xgb.LGBMClassifier(**self.model_params['xx'])
         except KeyError as e:
             print(f"Error initializing models: {e}")
             raise
@@ -49,7 +48,7 @@ class Trainer:
         
         ## LightGBM
         # モデルの呼び出し
-        _light = self.light
+        _light_classify = self.light_classify
         # callback
         callbacks = [
             log_evaluation(period=25), 
@@ -57,7 +56,7 @@ class Trainer:
             first_metric_only=True)
         ]
         # 学習
-        _light.fit(
+        _light_classify.fit(
             X_train_part, y_train_part,
             eval_set=[(X_train_part, y_train_part), (X_early_stopping, y_early_stopping)],
             eval_metric=quadratic_weighted_kappa,
@@ -65,7 +64,6 @@ class Trainer:
         )
         # 最適な学習回数の保存
         self.best_light_iteration = self.light.best_iteration_
-        # self.best_light_iteration = _light.best_iteration_
 
         ## XGB
         # モデルの呼び出し
@@ -89,7 +87,6 @@ class Trainer:
         """モデルの学習"""
 
         self.light.n_estimators = self.best_light_iteration
-        # print(f"lgbmイテレーション回数：{self.light.n_estimators}")
         self.light.fit(X_train, y_train)
 
         self.xgb_regressor.n_estimators = self.best_xgb_iteration + 1  # XGBoost は0ベースのインデックスなので、1を加える

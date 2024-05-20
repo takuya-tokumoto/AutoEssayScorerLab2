@@ -1,9 +1,9 @@
 
-sampling_mode: False 
-model_name: 202405182350-fold-tfidf
+sampling_mode: False # True:データを100件にサンプリング
+model_name: 202405201443-5folds # 実験名を記載 ※'_'は使わず'-'を利用する事
 target: score
 SEED: 2018
-n_splits: 15
+n_splits: 5
 avg_train_score: 2.998
 var_train_score: 1.092
 MAX_LENGTH: 1024
