@@ -64,8 +64,7 @@ class Trainer:
             callbacks=callbacks
         )
         # 最適な学習回数の保存
-        self.best_light_iteration = self.light.best_iteration_
-        # self.best_light_iteration = _light.best_iteration_
+        self.best_light_iteration = _light.best_iteration_
 
         ## XGB
         # モデルの呼び出し

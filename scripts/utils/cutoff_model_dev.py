@@ -24,9 +24,9 @@ class Trainer:
     def __init__(self, config, model_params):
         self.config = config
         self.model_params = model_params
-        self.light = None  # LightGBM モデル
+        self.light = None  # LightGBM classifyモデル
         self.best_light_iteration = 150 # 仮で150
-        self.xgb_regressor = None  # XGBoost モデル
+        self.cat_classify = None  # CatBoost classify モデル
         self.best_xgb_iteration = 150 # 仮で150
 
     def initialize_models(self):
@@ -59,22 +59,21 @@ class Trainer:
         _light_classify.fit(
             X_train_part, y_train_part,
             eval_set=[(X_train_part, y_train_part), (X_early_stopping, y_early_stopping)],
-            eval_metric=quadratic_weighted_kappa,
             callbacks=callbacks
         )
         # 最適な学習回数の保存
-        self.best_light_iteration = self.light.best_iteration_
+        self.best_light_iteration = self._light_classify.best_iteration_
 
-        ## XGB
+        ## Catboost
         # モデルの呼び出し
-        _xgb_regressor = self.xgb_regressor
+        _cat_classify = self.cat_classify
         # callback  
         xgb_callbacks = [
             xgb.callback.EvaluationMonitor(period=25),
             xgb.callback.EarlyStopping(75, metric_name="QWK", maximize=True, save_best=True)
         ]
         # 学習
-        _xgb_regressor.fit(
+        _cat_classify.fit(
             X_train_part, y_train_part,
             eval_set=[(X_train_part, y_train_part), (X_early_stopping, y_early_stopping)],
             eval_metric=quadratic_weighted_kappa,
