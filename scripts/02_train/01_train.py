@@ -104,12 +104,12 @@ model_params = {
     }
 }
 
-def load_data(path):
+def load_data(path: Path) -> pd.DataFrame:
     """データ読み込み"""
 
     return pd.read_csv(path)
 
-def prepare_data(input_data, feature_select):
+def prepare_data(input_data: pd.DataFrame, feature_select: list):
     """データを指定の変数で絞りこんだうえで学習データ(X, y, y_int)を作成"""
 
     X = input_data[feature_select].astype(np.float32).values
@@ -118,7 +118,9 @@ def prepare_data(input_data, feature_select):
 
     return X, y, y_int
 
-def cross_validate(config):
+def cross_validate(config: dict) -> None:
+    """xx"""
+
     f1_scores = []
     kappa_scores = []
     predictions = []
@@ -138,6 +140,7 @@ def cross_validate(config):
         
         ## 特徴量の絞り込み計算 -> 変数重要度上位13,000件をピックアップ
         ## データ準備
+        """↓prepare_data関数の中に含めた方がすっきりする？"""
         feature_all = list(filter(lambda x: x not in ['essay_id','score'], train_data.columns))
         train_X, train_y, train_y_int = prepare_data(train_data, feature_all)
         valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_all)

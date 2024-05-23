@@ -1,6 +1,6 @@
 
-sampling_mode: False # True:データを100件にサンプリング
-model_name: 202405201443-5folds # 実験名を記載 ※'_'は使わず'-'を利用する事
+sampling_mode: True # True:データを100件にサンプリング
+model_name: 202405231124-add-cutoff-score # 実験名を記載 ※'_'は使わず'-'を利用する事
 target: score
 SEED: 2018
 n_splits: 5

@@ -40,7 +40,9 @@ class PathManager:
         self.train_logs_dir: Path = self.input_dir / f"train-logs-{mode}/"
         ## input/train_logs_{mode}/vectorize_weight/
         self.vectorizer_weight_dir: Path = self.train_logs_dir / f"vectorizer-weight/"
-        ## モデルの重み：input/train_logs_{mode}/ens_model_weight/
+        ## カットオフモデルの重み：input/train_logs_{mode}/cutoff-model-weight/
+        self.cutoff_models_weight_dir: Path = self.train_logs_dir / f"cutoff-model-weight/"
+        ## アンサンブルモデルの重み：input/train_logs_{mode}/ens_model_weight/
         self.models_weight_dir: Path = self.train_logs_dir / "ens-model-weight/"
         ## ログファイル：input/train_logs_{mode}/ens_model_weight/training.log
         self.log_file_dir: Path = self.models_weight_dir / "training.log"

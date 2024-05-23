@@ -12,31 +12,30 @@ with open(config_path, "r", encoding='utf-8') as file:
 ## Import
 import numpy as np
 import lightgbm as lgb
-from lightgbm import log_evaluation, early_stopping
 from sklearn.model_selection import train_test_split
 import xgboost as xgb
 from sklearn.metrics import cohen_kappa_score
-from catboost import CatBoostRegressor, CatBoostClassifier
+import catboost as cb
+# from catboost import CatBoostRegressor, CatBoostClassifier
 import joblib
 
 ## モデル用クラス
-class Trainer:
-    def __init__(self, config, model_params):
+class CutOffTrainer:
+    def __init__(self, config: dict, model_params: dict):
         self.config = config
         self.model_params = model_params
-        self.light = None  # LightGBM classifyモデル
+        self.light_classify = None  # LightGBM classifyモデル
         self.best_light_iteration = 150 # 仮で150
         self.cat_classify = None  # CatBoost classify モデル
-        self.best_xgb_iteration = 150 # 仮で150
+        self.best_cat_iteration = 150 # 仮で150
 
     def initialize_models(self):
         """モデルの初期化"""
-
         try:
-            self.cat_classify = lgb.CatBoostClassifier(**self.model_params['xx'])
-            self.light_classify = xgb.LGBMClassifier(**self.model_params['xx'])
+            self.light_classify = lgb.LGBMClassifier(**self.model_params['light_classify'])
+            self.cat_classify = cb.CatBoostClassifier(**self.model_params['cat_classify'])
         except KeyError as e:
-            print(f"Error initializing models: {e}")
+            print(f"Model parameter key missing: {e}")
             raise
 
     def train_with_early_stopping(self, X_train, y_train):
@@ -51,9 +50,8 @@ class Trainer:
         _light_classify = self.light_classify
         # callback
         callbacks = [
-            log_evaluation(period=25), 
-            early_stopping(stopping_rounds=75,
-            first_metric_only=True)
+            lgb.callback.log_evaluation(period=25), 
+            lgb.callback.early_stopping(stopping_rounds=75, first_metric_only=True)
         ]
         # 学習
         _light_classify.fit(
@@ -62,55 +60,45 @@ class Trainer:
             callbacks=callbacks
         )
         # 最適な学習回数の保存
-        self.best_light_iteration = self._light_classify.best_iteration_
+        self.best_light_iteration = _light_classify.best_iteration_
 
         ## Catboost
         # モデルの呼び出し
         _cat_classify = self.cat_classify
-        # callback  
-        xgb_callbacks = [
-            xgb.callback.EvaluationMonitor(period=25),
-            xgb.callback.EarlyStopping(75, metric_name="QWK", maximize=True, save_best=True)
-        ]
         # 学習
         _cat_classify.fit(
             X_train_part, y_train_part,
             eval_set=[(X_train_part, y_train_part), (X_early_stopping, y_early_stopping)],
-            eval_metric=quadratic_weighted_kappa,
-            callbacks=xgb_callbacks
+            use_best_model=True
         )
         # 最適な学習回数の保存
-        self.best_xgb_iteration = _xgb_regressor.best_iteration
+        self.best_cat_iteration = _cat_classify.get_best_iteration()
     
     def train(self, X_train, y_train):
         """モデルの学習"""
 
-        self.light.n_estimators = self.best_light_iteration
-        self.light.fit(X_train, y_train)
+        self.light_classify.n_estimators = self.best_light_iteration
+        self.light_classify.fit(X_train, y_train)
 
-        self.xgb_regressor.n_estimators = self.best_xgb_iteration + 1  # XGBoost は0ベースのインデックスなので、1を加える
-        # print(f"xgbイテレーション回数：{self.xgb_regressor.n_estimators}")
-        self.xgb_regressor.fit(X_train, y_train)
+        self.cat_classify.n_estimators = self.best_cat_iteration
+        self.cat_classify.fit(X_train, y_train)
 
     def save_weight(self, save_path):
         """モデルの学習結果を保存"""
 
-        joblib.dump(self.light, os.path.join(save_path, 'lgbm_model.pkl'))
-        self.xgb_regressor.save_model(os.path.join(save_path, 'xgb_model.json'))
+        joblib.dump(self.light_classify, os.path.join(save_path, 'light_classify_model.pkl'))
+        self.cat_classify.save_model(os.path.join(save_path, 'cat_classify_model.cbm'))
 
     def load_weight(self, save_path):
         """モデルの重みをロード"""
         
-        self.light = joblib.load(os.path.join(save_path, 'lgbm_model.pkl'))
-        self.xgb_regressor.load_model(os.path.join(save_path, 'xgb_model.json'))
+        self.light_classify = joblib.load(os.path.join(save_path, 'light_classify_model.pkl'))
+        self.cat_classify.load_model(os.path.join(save_path, 'cat_classify_model.cbm'))
     
     def predict(self, X):
         """予測結果を出力"""
 
-        predicted = None
-        predicted = (
-            0.76*self.light.predict(X)
-            + 0.24*self.xgb_regressor.predict(X)
-        )
+        predicted_light = self.light_classify.predict_proba(X)[:,1]
+        predicted_cat = self.cat_classify.predict_proba(X)[:,1]
 
-        return predicted
+        return predicted_light, predicted_cat
