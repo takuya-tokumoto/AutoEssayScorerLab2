@@ -110,13 +110,24 @@ def load_data(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 def prepare_data(input_data: pd.DataFrame, feature_select: list):
-    """データを指定の変数で絞りこんだうえで学習データ(X, y, y_int)を作成"""
+    """データを指定の変数で絞りこんだうえで学習データ(X, y, y_int)と除外後の変数リスト(_feature_select)を作成"""
 
-    X = input_data[feature_select].astype(np.float32).values
+    ## 不要項目を排除
+    _feature_select = [
+        feature for feature in feature_select 
+        if feature not in ['essay_id', 'score', 'full_text']
+    ]
+    # # cut-off由来のスコア由来の項目(e.g. *_cut) 
+    # _feature_select = [
+    #     feature for feature in _feature_select
+    #     if not feature.endswith('_cut')
+    # ]
+
+    X = input_data[_feature_select].astype(np.float32).values
     y = input_data[config['target']].astype(np.float32).values - config['avg_train_score']
     y_int = input_data[config['target']].astype(int).values
 
-    return X, y, y_int
+    return X, y, y_int, _feature_select
 
 def cross_validate(config: dict) -> None:
     """xx"""
@@ -140,16 +151,15 @@ def cross_validate(config: dict) -> None:
         
         ## 特徴量の絞り込み計算 -> 変数重要度上位13,000件をピックアップ
         ## データ準備
-        """↓prepare_data関数の中に含めた方がすっきりする？"""
-        feature_all = list(filter(lambda x: x not in ['essay_id','score'], train_data.columns))
-        train_X, train_y, train_y_int = prepare_data(train_data, feature_all)
-        valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_all)
+        feature_all = train_data.columns
+        train_X, train_y, train_y_int, tr_feature_select = prepare_data(train_data, feature_all)
+        valid_X, valid_y, valid_y_int, val_feature_select = prepare_data(valid_data, feature_all)
         ## 全特徴量含めて学習
         trainer_all = Trainer(config, model_params)
         trainer_all.initialize_models()
         trainer_all.train(train_X, train_y)
         ## 変数重要度を取得
-        fse = pd.Series(trainer_all.light.feature_importances_, feature_all)
+        fse = pd.Series(trainer_all.light.feature_importances_, tr_feature_select)
         feature_select = fse.sort_values(ascending=False).index.tolist()[:13000]
         ## feature_select リストを pickle ファイルとして保存
         with open(model_fold_path / 'feature_select.pickle', 'wb') as f:
@@ -157,8 +167,10 @@ def cross_validate(config: dict) -> None:
 
         ### 特徴量を絞り込んだうえでモデル学習
         ## データ準備
-        train_X, train_y, train_y_int = prepare_data(train_data, feature_select)
-        valid_X, valid_y, valid_y_int = prepare_data(valid_data, feature_select)
+        train_X, train_y, train_y_int, tr_feature_select = prepare_data(train_data, feature_select)
+        valid_X, valid_y, valid_y_int, tr_feature_select = prepare_data(valid_data, feature_select)
+        # train_X, train_y, train_y_int, tr_feature_select = prepare_data(train_data, tr_feature_select)
+        # valid_X, valid_y, valid_y_int, tr_feature_select = prepare_data(valid_data, val_feature_select)
         # 正解データを格納
         actual_labels.extend(valid_y_int)
 

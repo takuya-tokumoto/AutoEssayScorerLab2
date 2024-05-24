@@ -42,7 +42,6 @@ class GenerateMetaFeatures():
             'cat_classify': {
                 'thread_count': 4, 
                 'random_seed': 42,
-                'verbose': False,
                 "logging_level": "Silent"  # ログを出力しないように設定
             }
         }
@@ -191,7 +190,7 @@ class GenerateMetaFeatures():
         """データを指定の変数で絞りこんだうえで学習データ(X, y, y_int)を作成"""
 
         ## 不要項目を排除
-        # self.exclude_features: score, full_text, essey_idなど
+        # self.exclude_features: ['essay_id', 'score', 'full_text']
         feature_select = [
             feature for feature in feature_select 
             if feature not in self.exclude_features
@@ -200,6 +199,11 @@ class GenerateMetaFeatures():
         feature_select = [
             feature for feature in feature_select
             if not feature.endswith('_cut')
+        ]
+        # tf-idf由来の項目 -> 項目が多く機械工数が膨大なため
+        feature_select = [
+            feature for feature in feature_select
+            if not feature.startswith('tfid_')
         ]
 
         ## 指定された項目を説明変数として取得
