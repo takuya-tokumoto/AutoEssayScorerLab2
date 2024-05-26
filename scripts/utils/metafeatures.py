@@ -224,6 +224,7 @@ class GenerateMetaFeatures():
         tr_df = pd.DataFrame()  
         prev_cutoff = None
         for cut_point in self.cut_point_list:
+            print(f"cut-off point {cut_point}")
 
             ## cut-off用のデータを準備 ※不要な特徴量削除
             feature_all = train_data.columns
@@ -266,8 +267,8 @@ class GenerateMetaFeatures():
             # prev_cutoffを更新
             prev_cutoff = cut_point
 
-            print(f'AUC score for LGBM {cut_point} model: {roc_auc_score(train_y, predicted_light)}')
-            print(f'AUC score for CatBoost {cut_point} model: {roc_auc_score(train_y, predicted_cat)}')
+            # print(f'AUC score for LGBM {cut_point} model: {roc_auc_score(train_y, predicted_light)}')
+            # print(f'AUC score for CatBoost {cut_point} model: {roc_auc_score(train_y, predicted_cat)}')
 
         tr_df['essay_id'] = train_data['essay_id']
 
@@ -322,7 +323,6 @@ class GenerateMetaFeatures():
 
         return te_df
     
-
     def preprocessing_train(self) -> pd.DataFrame :
         """学習データ(train_data)に対して一連の処理を実行"""
 

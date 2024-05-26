@@ -14,9 +14,8 @@ import numpy as np
 import lightgbm as lgb
 from sklearn.model_selection import train_test_split
 import xgboost as xgb
-from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import cohen_kappa_score, roc_auc_score
 import catboost as cb
-# from catboost import CatBoostRegressor, CatBoostClassifier
 import joblib
 
 ## モデル用クラス
@@ -62,6 +61,9 @@ class CutOffTrainer:
         # 最適な学習回数の保存
         self.best_light_iteration = _light_classify.best_iteration_
 
+        predicted_light = _light_classify.predict_proba(X_early_stopping)[:,1]
+        print(f'AUC score for LGBM model: {roc_auc_score(y_early_stopping, predicted_light)}')
+
         ## Catboost
         # モデルの呼び出し
         _cat_classify = self.cat_classify
@@ -73,6 +75,9 @@ class CutOffTrainer:
         )
         # 最適な学習回数の保存
         self.best_cat_iteration = _cat_classify.get_best_iteration()
+
+        predicted_cat = _cat_classify.predict_proba(X_early_stopping)[:,1]
+        print(f'AUC score for CatBoost model: {roc_auc_score(y_early_stopping, predicted_cat)}')
     
     def train(self, X_train, y_train):
         """モデルの学習"""
