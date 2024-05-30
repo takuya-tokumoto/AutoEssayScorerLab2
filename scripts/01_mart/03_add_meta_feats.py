@@ -44,15 +44,15 @@ if __name__ == '__main__':
         train_data_add = generate_meta.preprocessing_train()
         valid_data_add = generate_meta.preprocessing_test()
 
-        # 以降、full_text項目は不要なためドロップ
+        ## 以降、full_text項目は不要なためドロップ
         train_data_add = train_data_add.drop(["full_text"], axis=1)
         valid_data_add = valid_data_add.drop(["full_text"], axis=1)
 
-        # ディレクトリ準備    
+        ## ディレクトリ準備    
         base_fold_dir: Path = path_to.add_meta_mart_dir / f'fold_{fold_num}/'
         base_fold_dir.mkdir(parents=True, exist_ok=True)
 
-        # CSVファイルとして保存
+        ## CSVファイルとして保存
         train_fold_save_dir: Path = base_fold_dir / 'train_fold_add_meta.csv'
         train_data_add.to_csv(train_fold_save_dir, index=False)
         valid_fold_save_dir: Path = base_fold_dir / 'valid_fold_add_meta.csv'

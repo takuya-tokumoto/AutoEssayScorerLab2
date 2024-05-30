@@ -20,6 +20,10 @@ class PathManager:
         self.origin_sample_submit_dir: Path = (
             self.input_dir / "learning-agency-lab-automated-essay-scoring-2/sample_submission.csv"
         )
+        # persuade corpus 2.0
+        self.persaude_corpus_2_dir: Path = (
+            self.input_dir / "persaude-corpus-2/persuade_2.0_human_scores_demo_id_github.csv"
+        )
         # english-word-hx
         self.english_word_hx_dir: Path = (
             self.input_dir / "english-word-hx/words.txt"

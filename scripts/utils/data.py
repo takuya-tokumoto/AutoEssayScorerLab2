@@ -47,7 +47,56 @@ class CreateDataset():
     def load_dataset(self):
         """データ読み込み"""
         
-        self.train_data = self.load_data(self.path_to.origin_train_dir)
+        ## trainデータ
+        # 読み込み
+        origin_train_data = self.load_data(self.path_to.origin_train_dir)
+        # 追加したデータにフラグを付与 -> validデータには含めないよう識別用に準備
+        origin_train_data = (
+            origin_train_data
+                .with_columns(pl.lit("0").alias("suppliment_flg"))
+        )
+        # 結合用のkeyを作成
+        origin_train_data = (
+            origin_train_data
+                .with_columns(pl.col("full_text").str.strip().alias('tmp_key'))
+        )
+
+        ## persaude2.0からtrainデータに含まれていない実績を補填
+        # persaude2.0
+        persuade_data = (
+            pl.read_csv(self.path_to.persaude_corpus_2_dir)
+                .rename({"holistic_essay_score": self.config["target"], 
+                         "essay_id_comp" : "essay_id"})
+                .with_columns(pl.col("full_text").str.split(by="\n\n").alias("paragraph"))
+                .select("essay_id", "full_text", self.config["target"], "paragraph")
+        )
+        # 追加したデータにフラグを付与 -> validデータには含めないよう識別用に準備
+        persuade_data = (
+            persuade_data
+                .with_columns(pl.lit("1").alias("suppliment_flg"))
+        )
+        # 結合用のkeyを作成
+        persuade_data = (
+            persuade_data
+                .with_columns(pl.col("full_text").str.strip().alias('tmp_key'))
+        )
+        # trainデータに含まれていないデータを抽出
+        suppliment_data = (
+            persuade_data.join(origin_train_data, how="anti", on=["tmp_key"])
+        )
+        # essey_idが重複している実績を削除 -> renameして残す選択肢もあるがいったん削除で対応
+        suppliment_data = suppliment_data.filter(pl.col("essay_id")!="3.25E+11")
+       
+        ## trainデータに追加データをタテ結合
+        combined_train_data = pl.concat([origin_train_data, suppliment_data], how="vertical")
+
+        ## 結合キー(tmp_key)は削除
+        combined_train_data = combined_train_data.drop("tmp_key")
+
+        ## 加工後のtrainデータをコンストラクタに格納
+        self.train_data = combined_train_data
+
+        ## testデータ
         self.test_data = self.load_data(self.path_to.origin_test_dir)
 
         if self.config['sampling_mode']:
@@ -403,7 +452,7 @@ class CreateDataset():
         """学習データ(train_data)に対して一連の処理を実行"""
 
         self.load_dataset()
-        
+
         # Paragraph
         tmp = self.Paragraph_Preprocess(self.train_data)
         train_feats = self.Paragraph_Eng(tmp)
@@ -413,6 +462,8 @@ class CreateDataset():
         train_feats['score'] = self.train_data['score']
         # full_text -> 後の処理で必要なので付与 ※決定木モデルには直接投入しないよう注意
         train_feats['full_text'] = self.train_data['full_text']
+        # suppliment_flg -> 後の処理で必要なので付与 ※決定木モデルには直接投入しないよう注意
+        train_feats['suppliment_flg'] = self.train_data['suppliment_flg']
 
         # Sentence
         tmp = self.Sentence_Preprocess(self.train_data)
@@ -447,6 +498,8 @@ class CreateDataset():
 
         # full_text -> 後の処理で必要なので付与 ※決定木モデルには直接投入しないよう注意
         test_feats['full_text'] = self.test_data['full_text']
+        # suppliment_flg -> 後の処理で必要なので付与 ※決定木モデルには直接投入しないよう注意
+        test_feats['suppliment_flg'] = self.test_data['suppliment_flg']
 
         # Sentence
         tmp = self.Sentence_Preprocess(self.test_data)
