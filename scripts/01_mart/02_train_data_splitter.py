@@ -29,6 +29,7 @@ if __name__ == '__main__':
     path_to = PathManager(s3_dir, mode)
 
     ## 追加データ用意
+    load_path = path_to.train_all_mart_dir
     suppliment_data = pl.read_csv(load_path).filter(pl.col("suppliment_flg")==1)
     # 目的変数と説明変数を分割
     X_sup = suppliment_data.drop(config['target'])
@@ -51,7 +52,6 @@ if __name__ == '__main__':
     suppliment_w_fold = pl.concat(suppliment_data_list, how="vertical")
 
     ## 学習データ用意
-    load_path = path_to.train_all_mart_dir
     train_data = pl.read_csv(load_path).filter(pl.col("suppliment_flg")==0)
     # 目的変数と説明変数を分割
     X = train_data.drop(config['target'])
