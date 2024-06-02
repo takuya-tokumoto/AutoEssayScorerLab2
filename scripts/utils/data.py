@@ -23,6 +23,11 @@ from transformers import (
 )
 from datasets import Dataset
 from glob import glob
+import textstat
+from spellchecker import SpellChecker
+from collections import Counter
+import nltk 
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 # 自作関数の読み込み
 from .path import PathManager
 
@@ -333,6 +338,135 @@ class CreateDataset():
         df = train_tmp.group_by(['essay_id'], maintain_order=True).agg(aggs).sort("essay_id")
         df = df.to_pandas()
         return df
+
+
+    def add_textstat_features(self, df):
+
+        def textstat_features(text):
+            features = {}
+            features['flesch_reading_ease'] = textstat.flesch_reading_ease(text)
+            features['flesch_kincaid_grade'] = textstat.flesch_kincaid_grade(text)
+            features['smog_index'] = textstat.smog_index(text)
+            features['coleman_liau_index'] = textstat.coleman_liau_index(text)
+            features['automated_readability_index'] = textstat.automated_readability_index(text)
+            features['dale_chall_readability_score'] = textstat.dale_chall_readability_score(text)
+            features['difficult_words'] = textstat.difficult_words(text)
+            features['linsear_write_formula'] = textstat.linsear_write_formula(text)
+            features['gunning_fog'] = textstat.gunning_fog(text)
+            features['text_standard'] = textstat.text_standard(text, float_output=True)
+            features['spache_readability'] = textstat.spache_readability(text)
+            features['mcalpine_eflaw'] = textstat.mcalpine_eflaw(text)
+            features['reading_time'] = textstat.reading_time(text)
+            features['syllable_count'] = textstat.syllable_count(text)
+            features['lexicon_count'] = textstat.lexicon_count(text)
+            features['monosyllabcount'] = textstat.monosyllabcount(text)
+
+            return features
+        
+        df['textstat_features'] = df['full_text'].apply(textstat_features)
+        textstat_features_df = pd.DataFrame(df['textstat_features'].tolist())
+        return textstat_features_df
+
+
+    def add_extract_linguistic_features(self, df):
+        def extract_linguistic_features(text):
+            doc = self.nlp(text)
+            features = {}
+
+            # NER Features
+            entity_counts = Counter([entity.label_ for entity in doc.ents])
+            features.update(entity_counts)
+
+            # POS Features
+            pos_counts = Counter([token.pos_ for token in doc])
+            features.update(pos_counts)
+
+            # Tag Features
+            tag_counts = Counter([token.tag_ for token in doc])
+            features.update(tag_counts)
+
+            # Tense Features
+            tenses = [i.morph.get("Tense") for i in doc]
+            tenses = [i[0] for i in tenses if i]
+            tense_counts = Counter(tenses)
+            features['past_tense_ratio'] = tense_counts.get("Past", 0) / (tense_counts.get("Pres", 0) + tense_counts.get("Past", 0) + 1e-5)
+            features['present_tense_ratio'] = tense_counts.get("Pres", 0) / (tense_counts.get("Pres", 0) + tense_counts.get("Past", 0) + 1e-5)
+            
+            # Length Features
+            features['word_count'] = len(doc)
+            features['sentence_count'] = len(list(doc.sents))
+            features['words_per_sentence'] = features['word_count'] / features['sentence_count']
+            features['std_words_per_sentence'] = np.std([len(sentence) for sentence in doc.sents])
+
+            features['unique_words'] = len(set(token.text for token in doc))
+            features['lexical_diversity'] = features['unique_words'] / features['word_count']
+
+            paragraphs = text.split('\n\n')
+            features['paragraph_count'] = len(paragraphs)
+            features['avg_chars_by_paragraph'] = np.mean([len(p) for p in paragraphs])
+            features['avg_words_by_paragraph'] = np.mean([len(nltk.word_tokenize(p)) for p in paragraphs])
+            features['avg_sentences_by_paragraph'] = np.mean([len(nltk.sent_tokenize(p)) for p in paragraphs])
+
+            # Sentiment Features
+            analyzer = SentimentIntensityAnalyzer()
+            sentences = nltk.sent_tokenize(text)
+            sentiment_scores = [analyzer.polarity_scores(sentence) for sentence in sentences]
+
+            features["mean_compound"] = np.mean([score['compound'] for score in sentiment_scores])
+            features["mean_negative"] = np.mean([score['neg'] for score in sentiment_scores])
+            features["mean_positive"] = np.mean([score['pos'] for score in sentiment_scores])
+            features["mean_neutral"] = np.mean([score['neu'] for score in sentiment_scores])
+
+            features["std_compound"] = np.std([score['compound'] for score in sentiment_scores])
+            features["std_negative"] = np.std([score['neg'] for score in sentiment_scores])
+            features["std_positive"] = np.std([score['pos'] for score in sentiment_scores])
+            features["std_neutral"] = np.std([score['neu'] for score in sentiment_scores])
+
+            return features
+        
+        df['linguistic_features'] = df['full_text'].apply(extract_linguistic_features)
+        linguistic_df = pd.DataFrame(df['linguistic_features'].to_list())
+        
+        return linguistic_df
+
+    # ratio列を計算し、train_linguisticとtest_linguisticに追加する関数
+    def add_ratio_columns(self, df):
+        tag_cols = [col for col in df.columns if col.startswith('tag')]
+        col_cols = [col for col in df.columns if col.startswith('col')]
+        pos_cols = [col for col in df.columns if col.startswith('pos')]
+
+        for col in tag_cols:
+            df[f"{col}_ratio"] = df[col] / df['word_count']
+
+        for col in col_cols:
+            df[f"{col}_ratio"] = df[col] / df['word_count']
+
+        for col in pos_cols:
+            df[f"{col}_ratio"] = df[col] / df['word_count']
+        return df
+
+    def add_spell_check(self, df):
+        def spell_check(text):
+            spell = SpellChecker()
+            words = nltk.word_tokenize(text)
+            misspelled = spell.unknown(words)
+            misspelled_count = len(misspelled)
+            misspelled_ratio = misspelled_count / len(words)
+            return misspelled_count, misspelled_ratio
+
+        spell_check_results = df['full_text'].apply(spell_check)
+        spell_check_df = pd.DataFrame(spell_check_results.to_list(), columns=['misspelled_count', 'misspelled_ratio'])
+        return spell_check_df
+
+    def readablity_features(self, df):
+        df = df.to_pandas()
+        textstat_features_df = self.add_textstat_features(df)
+        linguistic_features_df = self.add_extract_linguistic_features(df)
+        linguistic_features_df = self.add_ratio_columns(linguistic_features_df)
+        spell_check_df = self.add_spell_check(df)
+
+        return textstat_features_df, linguistic_features_df, spell_check_df
+        
     
     def load_deberta_preds_feats(self):
         """事前に作成済みのdebertaの予測値を読み込み"""
@@ -424,6 +558,15 @@ class CreateDataset():
         train_feats = train_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left') 
         print('---Word 特徴量作成完了---')
 
+        # Readablity
+        train_textstat_df, train_linguistic_df, train_spell_check_df = self.readablity_features(self.train_data)
+        train_feats = (
+            train_feats.merge(train_textstat_df, left_index=True, right_index=True)
+            .merge(train_linguistic_df, left_index=True, right_index=True)
+            .merge(train_spell_check_df, left_index=True, right_index=True)
+        )
+        print('---Readability 特徴量作成完了---')
+
         # # Debertaモデルの予測値
         # predicted_score = self.load_deberta_preds_feats()
         # # predicted_score = self.deberta_oof_scores(self.train_data)
@@ -457,6 +600,15 @@ class CreateDataset():
         tmp = self.Word_Preprocess(self.test_data)
         test_feats = test_feats.merge(self.Word_Eng(tmp), on='essay_id', how='left')
         print('---Word 特徴量作成完了---')
+
+        # Readablity
+        test_textstat_df, test_linguistic_df, test_spell_check_df = self.readablity_features(self.test_data)
+        test_feats = (
+            test_feats.merge(test_textstat_df, left_index=True, right_index=True)
+            .merge(test_linguistic_df, left_index=True, right_index=True)
+            .merge(test_spell_check_df, left_index=True, right_index=True)
+        )
+        print('---Readability 特徴量作成完了---')
 
         # # Debertaモデルの予測値
         # predicted_score = self.deberta_oof_scores(self.test_data)
