@@ -36,6 +36,7 @@ class PathManager:
         self.deberta_model_oof_dir: Path = (
             self.input_dir / "aes2-400-20240419134941/oof.pkl"
         )     
+        
         ### input/train_logs_{mode}/
         self.train_logs_dir: Path = self.input_dir / f"train-logs-{mode}/"
         ## input/train_logs_{mode}/vectorize_weight/
@@ -44,6 +45,10 @@ class PathManager:
         self.models_weight_dir: Path = self.train_logs_dir / "ens-model-weight/"
         ## ログファイル：input/train_logs_{mode}/ens_model_weight/training.log
         self.log_file_dir: Path = self.models_weight_dir / "training.log"
+        ## モデルの重み：input/train_logs_{mode}/deberta_v3_small_finetuned/
+        # self.deberta_v3_small_finetuned_dir: Path = self.train_logs_dir / "deberta_v3_small_finetuned/"
+        # s3だとうまく学習できないのでローカルにいったん保存
+        self.deberta_v3_small_finetuned_dir: Path = Path(f"/kaggle/nlp_model_weight/train-logs-{mode}/deberta_v3_small_finetuned/")
 
         ### input/middle_mart_{mode}/
         self.middle_mart_dir: Path = self.input_dir / f"middle-mart-{mode}/"
