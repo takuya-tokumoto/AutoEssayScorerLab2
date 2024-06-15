@@ -1,0 +1,13 @@
+numpy
+pandas
+scikit-learn
+transformers
+lightgbm
+xgboost
+polars
+scipy
+pyyaml
+dill
+matplotlib
+datasets
+torch
