@@ -10,4 +10,5 @@ pyyaml
 dill
 matplotlib
 datasets
+spacy
 torch
