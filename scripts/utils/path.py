@@ -3,6 +3,7 @@
 
 from pathlib import Path
 
+
 class PathManager:
     """ディレクトリパスおよびファイルパスを保持する。"""
 
@@ -11,32 +12,20 @@ class PathManager:
         #### input/
         self.input_dir: Path = repo_dir / "input/"
         # オリジナルのコンペデータ
-        self.origin_train_dir: Path = (
-            self.input_dir / "learning-agency-lab-automated-essay-scoring-2/train.csv"
-        )
-        self.origin_test_dir: Path = (
-            self.input_dir / "learning-agency-lab-automated-essay-scoring-2/test.csv"
-        )
+        self.origin_train_dir: Path = self.input_dir / "learning-agency-lab-automated-essay-scoring-2/train.csv"
+        self.origin_test_dir: Path = self.input_dir / "learning-agency-lab-automated-essay-scoring-2/test.csv"
         self.origin_sample_submit_dir: Path = (
             self.input_dir / "learning-agency-lab-automated-essay-scoring-2/sample_submission.csv"
         )
         # english-word-hx
-        self.english_word_hx_dir: Path = (
-            self.input_dir / "english-word-hx/words.txt"
-        )       
+        self.english_word_hx_dir: Path = self.input_dir / "english-word-hx/words.txt"
         # aes2-preprocessing
-        self.aes2_cache_dir: Path = (
-            self.input_dir / "aes2-preprocessing/feature_select.pickle"
-        )    
+        self.aes2_cache_dir: Path = self.input_dir / "aes2-preprocessing/feature_select.pickle"
         # aes2-400-20240419134941/*/*
-        self.pretrain_deberta_model_dir: Path = (
-            self.input_dir / "aes2-400-20240419134941/*/*"
-        )            
+        self.pretrain_deberta_model_dir: Path = self.input_dir / "aes2-400-20240419134941/*/*"
         # aes2-400-20240419134941/oof.pkl
-        self.deberta_model_oof_dir: Path = (
-            self.input_dir / "aes2-400-20240419134941/oof.pkl"
-        )     
-        
+        self.deberta_model_oof_dir: Path = self.input_dir / "aes2-400-20240419134941/oof.pkl"
+
         ### input/train_logs_{mode}/
         self.train_logs_dir: Path = self.input_dir / f"train-logs-{mode}/"
         ## input/train_logs_{mode}/vectorize_weight/
@@ -48,7 +37,9 @@ class PathManager:
         ## モデルの重み：input/train_logs_{mode}/deberta_v3_small_finetuned/
         # self.deberta_v3_small_finetuned_dir: Path = self.train_logs_dir / "deberta_v3_small_finetuned/"
         # s3だとうまく学習できないのでローカルにいったん保存
-        self.deberta_v3_small_finetuned_dir: Path = Path(f"/kaggle/nlp_model_weight/train-logs-{mode}/deberta_v3_small_finetuned/")
+        self.deberta_v3_small_finetuned_dir: Path = Path(
+            f"/kaggle/nlp_model_weight/train-logs-{mode}/deberta_v3_small_finetuned/"
+        )
 
         ### input/middle_mart_{mode}/
         self.middle_mart_dir: Path = self.input_dir / f"middle-mart-{mode}/"
@@ -57,18 +48,10 @@ class PathManager:
         ## input/middle_mart_{mode}/add_metafeats/
         self.add_meta_mart_dir: Path = self.middle_mart_dir / f"add_metafeats/"
         # 特徴量付きのデータフレーム
-        self.train_all_mart_dir: Path = (
-            self.middle_mart_dir / "train_all.csv"
-        )
-        self.test_all_mart_dir: Path = (
-            self.middle_mart_dir / "test_all.csv"
-        )
+        self.train_all_mart_dir: Path = self.middle_mart_dir / "train_all.csv"
+        self.test_all_mart_dir: Path = self.middle_mart_dir / "test_all.csv"
 
         #### output/
         self.output_dir: Path = repo_dir / "output/"
         ### submitファイル
         self.submit_dir: Path = self.output_dir / "submit.csv"
-
-
-
-        

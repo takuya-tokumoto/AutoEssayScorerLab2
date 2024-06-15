@@ -17,7 +17,6 @@ import logging
 import os
 import pickle
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -33,7 +32,7 @@ s3_dir = root_dir / "s3storage/01_public/auto_essay_scorer_lab2/data/"
 sys.path.append(str(repo_dir / "scripts/"))
 from utils.model import Trainer
 from utils.path import PathManager
-from utils.qwk import quadratic_weighted_kappa, qwk_obj
+from utils.qwk import qwk_obj
 
 ## パスの設定
 mode = config["model_name"]

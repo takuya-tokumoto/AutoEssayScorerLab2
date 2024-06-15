@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-## config.yamlの読み込み
-import yaml
 import os
+
+import yaml
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(current_dir, '..', 'config.yaml')
-with open(config_path, "r", encoding='utf-8') as file:
+config_path = os.path.join(current_dir, "..", "config.yaml")
+with open(config_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
-## Import
+
 import numpy as np
-import lightgbm as lgb
 import xgboost as xgb
 from sklearn.metrics import cohen_kappa_score
+
 
 ## Quadratic Weighted Kappaに関する関数
 def quadratic_weighted_kappa(y_true, y_pred):
@@ -49,17 +50,18 @@ def quadratic_weighted_kappa(y_true, y_pred):
         # XGB
         y_true, y_pred = y_pred, y_true
 
-        y_true = (y_true.get_label() + config['avg_train_score']).round()
-        y_pred = (y_pred + config['avg_train_score']).clip(1, 6).round()
+        y_true = (y_true.get_label() + config["avg_train_score"]).round()
+        y_pred = (y_pred + config["avg_train_score"]).clip(1, 6).round()
         qwk = cohen_kappa_score(y_true, y_pred, weights="quadratic")
-        return 'QWK', qwk
+        return "QWK", qwk
 
     else:
         # For lgb
-        y_true = y_true + config['avg_train_score']
-        y_pred = (y_pred + config['avg_train_score']).clip(1, 6).round()
+        y_true = y_true + config["avg_train_score"]
+        y_pred = (y_pred + config["avg_train_score"]).clip(1, 6).round()
         qwk = cohen_kappa_score(y_true, y_pred, weights="quadratic")
-        return 'QWK', qwk, True
+        return "QWK", qwk, True
+
 
 def qwk_obj(y_true, y_pred):
     """
@@ -83,14 +85,14 @@ def qwk_obj(y_true, y_pred):
         4. 損失関数から勾配 'grad' とヘッセ行列 'hess' を計算し、これらをモデルの学習プロセスに返します。
     """
 
-    labels = y_true + config['avg_train_score']
-    preds = y_pred + config['avg_train_score']
+    labels = y_true + config["avg_train_score"]
+    preds = y_pred + config["avg_train_score"]
     preds = preds.clip(1, 6)
-    f = 1/2*np.sum((preds-labels)**2)
-    g = 1/2*np.sum((preds-config['avg_train_score'])**2 + config['var_train_score'])
+    f = 1 / 2 * np.sum((preds - labels) ** 2)
+    g = 1 / 2 * np.sum((preds - config["avg_train_score"]) ** 2 + config["var_train_score"])
     df = preds - labels
-    dg = preds - config['avg_train_score']
-    grad = (df/g - f*dg/g**2)*len(labels)
+    dg = preds - config["avg_train_score"]
+    grad = (df / g - f * dg / g**2) * len(labels)
     hess = np.ones(len(labels))
 
     return grad, hess

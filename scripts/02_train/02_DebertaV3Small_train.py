@@ -3,7 +3,6 @@
 
 import os
 
-## config.yamlの読み込み
 import yaml
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -12,16 +11,11 @@ with open(config_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 import logging
-
-## Import
-import os
 import sys
 import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import dill
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from datasets import Dataset
@@ -102,7 +96,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-class CFG:
+class Config:
     # n_splits = 5
     seed = 42
     max_length = 1024  # to avoid truncating majority of essays.
@@ -188,7 +182,7 @@ class Tokenize(object):
         return ds
 
     def tokenize_function(self, example):
-        tokenized_inputs = self.tokenizer(example["full_text"], truncation=True, max_length=CFG.max_length)
+        tokenized_inputs = self.tokenizer(example["full_text"], truncation=True, max_length=Config.max_length)
         return tokenized_inputs
 
     def __call__(self):
@@ -253,18 +247,18 @@ def cross_validate(config):
         training_args = TrainingArguments(
             output_dir=model_fold_path,
             fp16=True,
-            learning_rate=CFG.lr,
-            per_device_train_batch_size=CFG.train_batch_size,
-            per_device_eval_batch_size=CFG.eval_batch_size,
-            num_train_epochs=CFG.train_epochs,
-            weight_decay=CFG.weight_decay,
+            learning_rate=Config.lr,
+            per_device_train_batch_size=Config.train_batch_size,
+            per_device_eval_batch_size=Config.eval_batch_size,
+            num_train_epochs=Config.train_epochs,
+            weight_decay=Config.weight_decay,
             evaluation_strategy="no",  # 評価を無効にする 'epoch',
             metric_for_best_model="qwk",
             save_strategy="no",  # 評価を無効にする 'epoch',
             save_total_limit=1,
             load_best_model_at_end=True,
             report_to="none",
-            warmup_ratio=CFG.warmup_ratio,
+            warmup_ratio=Config.warmup_ratio,
             lr_scheduler_type="linear",  # "cosine" or "linear" or "constant"
             optim="adamw_torch",
             logging_first_step=True,
@@ -288,7 +282,7 @@ def cross_validate(config):
             config.hidden_dropout_prob = 0.0
             config.num_labels = 1
         else:
-            config.num_labels = CFG.num_labels
+            config.num_labels = Config.num_labels
 
         if LOAD_FROM:
             model = AutoModelForSequenceClassification.from_pretrained(model_fold_path)
