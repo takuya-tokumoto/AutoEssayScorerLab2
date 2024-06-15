@@ -36,6 +36,7 @@ def set_logger(module_name: str) -> Logger:
     """
     # loggerの取得
     logger = getLogger(module_name)
+    logger.setLevel(INFO)
 
     # 既存のハンドラをクリア
     if logger.hasHandlers():
