@@ -61,7 +61,7 @@ if __name__ == '__main__':
     load_path = path_to.train_all_mart_dir
     train_data = pd.read_csv(load_path)
     # 分割
-    feature_names = list(filter(lambda x: x not in ['essay_id','score'], train_data.columns))
+    feature_names = list(filter(lambda x: x not in ['essay_id','score','full_text'], train_data.columns))
     features = feature_names
     # 目的変数と特徴量に分割
     X = train_data[feature_names].astype(np.float32).values

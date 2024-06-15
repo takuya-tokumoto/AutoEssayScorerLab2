@@ -373,54 +373,82 @@ class CreateDataset():
             doc = self.nlp(text)
             features = {}
 
-            # NER Features
-            entity_counts = Counter([entity.label_ for entity in doc.ents])
-            features.update(entity_counts)
+                # NER Features
+            entity_counts = {"GPE": 0, "PERCENT": 0, "NORP": 0, "ORG": 0, "CARDINAL": 0, "MONEY": 0, "DATE": 0, 
+                            "LOC": 0, "PERSON": 0, "QUANTITY": 0, "EVENT": 0, "ORDINAL": 0, "WORK_OF_ART": 0, 
+                            "LAW": 0, "PRODUCT": 0, "TIME": 0, "FAC": 0, "LANGUAGE": 0}
+            for entity in doc.ents:
+                if entity.label_ in entity_counts:
+                    entity_counts[entity.label_] += 1
+            features['NER_Features'] = entity_counts
 
             # POS Features
-            pos_counts = Counter([token.pos_ for token in doc])
-            features.update(pos_counts)
+            pos_counts = {"ADJ": 0, "NOUN": 0, "VERB": 0, "SCONJ": 0, "PRON": 0, "PUNCT": 0, "DET": 0, "AUX": 0, 
+                        "PART": 0, "ADP": 0, "SPACE": 0, "CCONJ": 0, "PROPN": 0, "NUM": 0, "ADV": 0, 
+                        "SYM": 0, "INTJ": 0, "X": 0}
+            for token in doc:
+                if token.pos_ in pos_counts:
+                    pos_counts[token.pos_] += 1
+            features['POS_Features'] = pos_counts
 
-            # Tag Features
-            tag_counts = Counter([token.tag_ for token in doc])
-            features.update(tag_counts)
+            # tag Features
+            tags = {"RB": 0, "-RRB-": 0, "PRP$": 0, "JJ": 0, "TO": 0, "VBP": 0, "JJS": 0, "DT": 0, "''": 0, "UH": 0, "RBS": 0, "WRB": 0, ".": 0, 
+                "HYPH": 0, "XX": 0, "``": 0, "SYM": 0, "VB": 0, "VBN": 0, "WP": 0, "CC": 0, "LS": 0, "POS": 0, "NN": 0, ",": 0, "NNPS": 0,
+                "RP": 0, ":": 0, "$": 0, "PDT": 0, "VBZ": 0, "VBD": 0, "JJR": 0, "-LRB-": 0, "IN": 0, "RBR": 0, "WDT": 0, "EX": 0, "MD": 0,
+                    "_SP": 0, "NNP": 0, "CD": 0, "VBG": 0, "NNS": 0, "PRP": 0}
+            
+            for token in doc:
+                if token.tag_ in tags:
+                    tags[token.tag_] += 1
+            features['tag_Features'] = tags
 
-            # Tense Features
+            # tense features
             tenses = [i.morph.get("Tense") for i in doc]
             tenses = [i[0] for i in tenses if i]
             tense_counts = Counter(tenses)
             features['past_tense_ratio'] = tense_counts.get("Past", 0) / (tense_counts.get("Pres", 0) + tense_counts.get("Past", 0) + 1e-5)
             features['present_tense_ratio'] = tense_counts.get("Pres", 0) / (tense_counts.get("Pres", 0) + tense_counts.get("Past", 0) + 1e-5)
             
-            # Length Features
+            
+            # len features
+
             features['word_count'] = len(doc)
-            features['sentence_count'] = len(list(doc.sents))
+            features['sentence_count'] = len([sentence for sentence in doc.sents])
             features['words_per_sentence'] = features['word_count'] / features['sentence_count']
             features['std_words_per_sentence'] = np.std([len(sentence) for sentence in doc.sents])
 
-            features['unique_words'] = len(set(token.text for token in doc))
+            features['unique_words'] = len(set([token.text for token in doc]))
             features['lexical_diversity'] = features['unique_words'] / features['word_count']
 
-            paragraphs = text.split('\n\n')
-            features['paragraph_count'] = len(paragraphs)
-            features['avg_chars_by_paragraph'] = np.mean([len(p) for p in paragraphs])
-            features['avg_words_by_paragraph'] = np.mean([len(nltk.word_tokenize(p)) for p in paragraphs])
-            features['avg_sentences_by_paragraph'] = np.mean([len(nltk.sent_tokenize(p)) for p in paragraphs])
+            paragraph = text.split('\n\n')
 
-            # Sentiment Features
+            features['paragraph_count'] = len(paragraph)
+
+            features['avg_chars_by_paragraph'] = np.mean([len(paragraph) for paragraph in paragraph])
+            features['avg_words_by_paragraph'] = np.mean([len(nltk.word_tokenize(paragraph)) for paragraph in paragraph])
+            features['avg_sentences_by_paragraph'] = np.mean([len(nltk.sent_tokenize(paragraph)) for paragraph in paragraph]) 
+
+            # sentiment features
             analyzer = SentimentIntensityAnalyzer()
             sentences = nltk.sent_tokenize(text)
-            sentiment_scores = [analyzer.polarity_scores(sentence) for sentence in sentences]
 
-            features["mean_compound"] = np.mean([score['compound'] for score in sentiment_scores])
-            features["mean_negative"] = np.mean([score['neg'] for score in sentiment_scores])
-            features["mean_positive"] = np.mean([score['pos'] for score in sentiment_scores])
-            features["mean_neutral"] = np.mean([score['neu'] for score in sentiment_scores])
+            compound_scores, negative_scores, positive_scores, neutral_scores = [], [], [], []
+            for sentence in sentences:
+                scores = analyzer.polarity_scores(sentence)
+                compound_scores.append(scores['compound'])
+                negative_scores.append(scores['neg'])
+                positive_scores.append(scores['pos'])
+                neutral_scores.append(scores['neu'])
 
-            features["std_compound"] = np.std([score['compound'] for score in sentiment_scores])
-            features["std_negative"] = np.std([score['neg'] for score in sentiment_scores])
-            features["std_positive"] = np.std([score['pos'] for score in sentiment_scores])
-            features["std_neutral"] = np.std([score['neu'] for score in sentiment_scores])
+            features["mean_compound"] = np.mean(compound_scores)
+            features["mean_negative"] = np.mean(negative_scores)
+            features["mean_positive"] = np.mean(positive_scores)
+            features["mean_neutral"] = np.mean(neutral_scores)
+
+            features["std_compound"] = np.std(compound_scores)
+            features["std_negative"] = np.std(negative_scores)
+            features["std_positive"] = np.std(positive_scores)
+            features["std_neutral"] = np.std(neutral_scores)
 
             return features
         
