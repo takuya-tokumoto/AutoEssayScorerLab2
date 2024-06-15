@@ -1,6 +1,6 @@
 
-sampling_mode: True # True:データを100件にサンプリング
-model_name: 202406150959-add-feature-5folds-test # 実験名を記載 ※'_'は使わず'-'を利用する事
+sampling_mode: False # True:データを100件にサンプリング
+model_name: 202406151038-add-feature-5folds # 実験名を記載 ※'_'は使わず'-'を利用する事
 target: score
 SEED: 2018
 n_splits: 5

@@ -453,9 +453,9 @@ class CreateDataset():
             return features
         
         df['linguistic_features'] = df['full_text'].apply(extract_linguistic_features)
-        linguistic_df = pd.DataFrame(df['linguistic_features'].to_list())
+        df_linguistic = pd.json_normalize(df['linguistic_features'])
         
-        return linguistic_df
+        return df_linguistic
 
     # ratio列を計算し、train_linguisticとtest_linguisticに追加する関数
     def add_ratio_columns(self, df):
