@@ -5,18 +5,13 @@ import os
 import sys
 import warnings
 from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 import yaml
 from datasets import Dataset
-from sklearn.metrics import (
-    ConfusionMatrixDisplay,
-    cohen_kappa_score,
-    confusion_matrix,
-    f1_score,
-)
-from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import cohen_kappa_score, f1_score
 from tokenizers import AddedToken
 from transformers import (
     AutoConfig,
@@ -45,15 +40,6 @@ mode = config["model_name"]
 path_to = PathManager(s3_dir, mode)
 
 # パラメータ設定
-# True USES REGRESSION, False USES CLASSIFICATION
-USE_REGRESSION = True
-# VERSION NUMBER FOR NAMING OF SAVED MODELS
-VER = 1
-# IF "LOAD_FROM" IS None, THEN WE TRAIN NEW MODELS
-# LOAD_FROM = "/kaggle/input/deberta-v3-small-finetuned-v1/"
-# WHEN TRAINING NEW MODELS SET COMPUTE_CV = True
-# WHEN LOADING MODELS, WE CAN CHOOSE True or False
-COMPUTE_CV = True
 MODEL_NAME = "microsoft/deberta-v3-small"
 
 # ロギングの設定
@@ -92,43 +78,46 @@ def seed_everything(seed):
 # seed_everything(seed=CFG.seed)
 
 
-def convert_columns(data: pd.DataFrame) -> pd.DataFrame:
-    """インプットデータの加工
+def load_datasets(input_data_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray]:
+    """所定のパスより学習/検証データを読み込む
 
     Args:
-        data (pd.DataFrame): 入力データ
+        input_data_dir (Path): ファイルの配置先パス
 
     Returns:
-        pd.DataFrame: 加工済データ
+        Tuple[pd.DataFrame, pd.DataFrame, np.ndarray]: 学習データ、検証データ、検証データの目的変数
     """
 
-    ## `label = score - 1`(labelは 0-5 の範囲に変更)
-    data["label"] = data["score"].apply(lambda x: x - 1)
+    def convert_columns(data: pd.DataFrame) -> pd.DataFrame:
+        """インプットデータの加工
 
-    ## label を回帰では `float32` に変換、分類の場合は `int32` に変換
-    if USE_REGRESSION:
+        Args:
+            data (pd.DataFrame): 入力データ
+
+        Returns:
+            pd.DataFrame: 加工済データ
+        """
+
+        # `label = score - 1`(labelは 0-5 の範囲に変更)
+        data["label"] = data["score"].apply(lambda x: x - 1)
+
+        # label を回帰では `float32` に変換、分類の場合は `int32` に変換
         data["label"] = data["label"].astype("float32")
-    else:
-        data["label"] = data["label"].astype("int32")
 
-    return data
+        return data
 
-
-def load_model_dataset(input_data_dir: Path) -> pd.DataFrame:
-    """インプットデータの用意"""
-
-    ## データの読み込み
+    # データの読み込み
     # full_textが残っている02_train_data_splitter.py出力マートを持ってくる
     train_path: Path = input_data_dir / f"train_fold.csv"
     _train_data = pd.read_csv(train_path)
     valid_path: Path = input_data_dir / f"valid_fold.csv"
     _valid_data = pd.read_csv(valid_path)
 
-    ## データ加工
+    # データ加工
     train_data = convert_columns(_train_data)
     valid_data = convert_columns(_valid_data)
 
-    ## 評価用にvalidデータの目的変数を用意
+    # 評価用にvalidデータの目的変数を用意
     valid_y_int = _valid_data["score"].astype(int).values
 
     return train_data, valid_data, valid_y_int
@@ -182,15 +171,6 @@ def compute_metrics_for_regression(eval_pred):
     return results
 
 
-def compute_metrics_for_classification(eval_pred):
-    """QWK評価関数（分類タスク）"""
-
-    predictions, labels = eval_pred
-    qwk = cohen_kappa_score(labels, predictions.argmax(-1), weights="quadratic")
-    results = {"qwk": qwk}
-    return results
-
-
 def cross_validate(config):
     f1_scores = []
     kappa_scores = []
@@ -199,9 +179,10 @@ def cross_validate(config):
 
     for i in range(config["n_splits"]):
 
-        ## データの読み込み
+        # データの読み込み
         base_fold_dir: Path = path_to.skf_mart_dir / f"fold_{i}/"
-        train_data, valid_data, valid_y_int = load_model_dataset(base_fold_dir)
+        train_data, valid_data, valid_y_int = load_datasets(base_fold_dir)
+
         # 正解データを格納
         actual_labels.extend(valid_y_int)
 
@@ -247,13 +228,10 @@ def cross_validate(config):
 
         ## Config
         config = AutoConfig.from_pretrained(MODEL_NAME)
-        if USE_REGRESSION:
-            ## 回帰タスクの場合ドロップアウトを除外
-            config.attention_probs_dropout_prob = 0.0
-            config.hidden_dropout_prob = 0.0
-            config.num_labels = 1
-        else:
-            config.num_labels = CFG.num_labels
+        ## 回帰タスクの場合ドロップアウトを除外
+        config.attention_probs_dropout_prob = 0.0
+        config.hidden_dropout_prob = 0.0
+        config.num_labels = 1
 
         if LOAD_FROM:
             model = AutoModelForSequenceClassification.from_pretrained(model_fold_path)
@@ -263,10 +241,8 @@ def cross_validate(config):
 
         ## 学習
         data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-        if USE_REGRESSION:
-            compute_metrics = compute_metrics_for_regression
-        else:
-            compute_metrics = compute_metrics_for_classification
+        compute_metrics = compute_metrics_for_regression
+
         trainer = Trainer(
             model=model,
             args=training_args,
@@ -277,33 +253,28 @@ def cross_validate(config):
             tokenizer=tokenizer,
             # compute_metrics=compute_metrics
         )
+
+        # 学習の実施と保存
         if LOAD_FROM is False:
             logger.info(f"学習を実行")
             trainer.train()
-
-        ## 学習結果を保存
-        if LOAD_FROM is False:
             logger.info(f"学習結果を保存")
             trainer.save_model(model_fold_path)
             tokenizer.save_pretrained(model_fold_path)
 
-        ## 学習結果を評価
-        _predictions_fold = trainer.predict(tokenized_valid).predictions
-        if USE_REGRESSION:
-            predictions_fold = _predictions_fold.round(0) + 1
-        else:
-            predictions_fold = _predictions_fold.argmax(axis=1) + 1
+        # 予測の実施と格納
+        predictions_fold = trainer.predict(tokenized_valid).predictions
+        predictions_fold = predictions_fold.round(0) + 1
         predictions_fold = np.clip(predictions_fold, 1, 6).round()
-        # 予測結果を格納
         predictions.extend(predictions_fold)
 
-        # F1スコア
+        # 評価値の算出
+        ## F1スコア
         f1_fold = f1_score(valid_y_int, predictions_fold, average="weighted")
         f1_scores.append(f1_fold)
-        # Cohen kappa score
+        ## Cohen kappa score
         kappa_fold = cohen_kappa_score(valid_y_int, predictions_fold, weights="quadratic")
         kappa_scores.append(kappa_fold)
-
         logger.info(f"F1 score for fold {i}: {f1_fold}")
         logger.info(f"Cohen kappa score for fold {i}: {kappa_fold}")
 
@@ -313,6 +284,7 @@ def cross_validate(config):
     # mean_kappa_score = np.mean(kappa_scores)
     # logger.info(f"Mean F1 score across {config['n_splits']} folds: {mean_f1_score}")
     # logger.info(f"Mean Cohen kappa score across {config['n_splits']} folds: {mean_kappa_score}")
+
     # OOFでの評価結果を算出
     oof_f1_score = f1_score(actual_labels, predictions, average="weighted")
     oof_kappa_score = cohen_kappa_score(actual_labels, predictions, weights="quadratic")
