@@ -92,8 +92,15 @@ def seed_everything(seed):
 # seed_everything(seed=CFG.seed)
 
 
-def convert_columns(data: pd.DataFrame):
-    """インプットデータ加工"""
+def convert_columns(data: pd.DataFrame) -> pd.DataFrame:
+    """インプットデータの加工
+
+    Args:
+        data (pd.DataFrame): 入力データ
+
+    Returns:
+        pd.DataFrame: 加工済データ
+    """
 
     ## `label = score - 1`(labelは 0-5 の範囲に変更)
     data["label"] = data["score"].apply(lambda x: x - 1)
