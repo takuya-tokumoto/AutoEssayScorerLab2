@@ -2,22 +2,13 @@
 # coding: utf-8
 
 import os
-
-import yaml
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(current_dir, "..", "config.yaml")
-with open(config_path, "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)
-
-import logging
 import sys
 import warnings
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 from datasets import Dataset
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
@@ -37,18 +28,23 @@ from transformers import (
 )
 
 warnings.simplefilter("ignore")
-# 自作関数の読み込み
 repo_dir = Path(__file__).parents[2]
 root_dir = Path(__file__).parents[3]
 s3_dir = root_dir / "s3storage/01_public/auto_essay_scorer_lab2/data/"
 sys.path.append(str(repo_dir / "scripts/"))
+from utils.logging import set_logger
 from utils.path import PathManager
 
-## パスの設定
+current_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(current_dir, "..", "config.yaml")
+with open(config_path, "r", encoding="utf-8") as file:
+    config = yaml.safe_load(file)
+
+# パスの設定
 mode = config["model_name"]
 path_to = PathManager(s3_dir, mode)
 
-## パラメータ設定
+# パラメータ設定
 # True USES REGRESSION, False USES CLASSIFICATION
 USE_REGRESSION = True
 # VERSION NUMBER FOR NAMING OF SAVED MODELS
@@ -60,43 +56,11 @@ VER = 1
 COMPUTE_CV = True
 MODEL_NAME = "microsoft/deberta-v3-small"
 
-## ロギングの設定
-# JSTタイムゾーンを定義
-JST = timezone(timedelta(hours=+9), "JST")
+# ロギングの設定
+logger = set_logger(__name__)
 
 
-# ロギングフォーマッタの拡張クラス
-class JSTFormatter(logging.Formatter):
-    def converter(self, timestamp):
-        dt = datetime.fromtimestamp(timestamp, tz=JST)
-        return dt.timetuple()
-
-    def formatTime(self, record, datefmt=None):
-        dt = datetime.fromtimestamp(record.created, tz=JST)
-        if datefmt:
-            s = dt.strftime(datefmt)
-        else:
-            try:
-                s = dt.isoformat(timespec="milliseconds")
-            except TypeError:
-                s = dt.isoformat()
-        return s
-
-
-# loggerの取得
-logger = logging.getLogger()
-# 既存のハンドラをクリア
-if logger.hasHandlers():
-    logger.handlers.clear()
-# 新しいハンドラを設定
-handler = logging.FileHandler("training.log")
-handler.setLevel(logging.INFO)
-formatter = JSTFormatter("%(asctime)s:%(levelname)s:%(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
-
-class Config:
+class CFG:
     # n_splits = 5
     seed = 42
     max_length = 1024  # to avoid truncating majority of essays.
@@ -182,7 +146,7 @@ class Tokenize(object):
         return ds
 
     def tokenize_function(self, example):
-        tokenized_inputs = self.tokenizer(example["full_text"], truncation=True, max_length=Config.max_length)
+        tokenized_inputs = self.tokenizer(example["full_text"], truncation=True, max_length=CFG.max_length)
         return tokenized_inputs
 
     def __call__(self):
@@ -247,18 +211,18 @@ def cross_validate(config):
         training_args = TrainingArguments(
             output_dir=model_fold_path,
             fp16=True,
-            learning_rate=Config.lr,
-            per_device_train_batch_size=Config.train_batch_size,
-            per_device_eval_batch_size=Config.eval_batch_size,
-            num_train_epochs=Config.train_epochs,
-            weight_decay=Config.weight_decay,
+            learning_rate=CFG.lr,
+            per_device_train_batch_size=CFG.train_batch_size,
+            per_device_eval_batch_size=CFG.eval_batch_size,
+            num_train_epochs=CFG.train_epochs,
+            weight_decay=CFG.weight_decay,
             evaluation_strategy="no",  # 評価を無効にする 'epoch',
             metric_for_best_model="qwk",
             save_strategy="no",  # 評価を無効にする 'epoch',
             save_total_limit=1,
             load_best_model_at_end=True,
             report_to="none",
-            warmup_ratio=Config.warmup_ratio,
+            warmup_ratio=CFG.warmup_ratio,
             lr_scheduler_type="linear",  # "cosine" or "linear" or "constant"
             optim="adamw_torch",
             logging_first_step=True,
@@ -282,7 +246,7 @@ def cross_validate(config):
             config.hidden_dropout_prob = 0.0
             config.num_labels = 1
         else:
-            config.num_labels = Config.num_labels
+            config.num_labels = CFG.num_labels
 
         if LOAD_FROM:
             model = AutoModelForSequenceClassification.from_pretrained(model_fold_path)
