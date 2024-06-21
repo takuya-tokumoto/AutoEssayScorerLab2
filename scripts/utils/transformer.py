@@ -165,8 +165,8 @@ class EssayScorer:
         trainer = self._setup_trainer(model, output_path)
 
         # トークナイズ化
-        tokenized_train = self._tokenize_data(train_data, self.tokenizer, self.max_length)
-        tokenized_valid = self._tokenize_data(valid_data, self.tokenizer, self.max_length)
+        tokenized_train = self._tokenize_data(train_data)
+        tokenized_valid = self._tokenize_data(valid_data)
 
         if not is_trained:
             logger.info(f"学習を実行")
