@@ -19,7 +19,7 @@ class ExperimentConfig:
 class TransformerConfig:
     """Transformerに影響する設定"""
 
-    model_name: str = "microsoft/deberta-v3-small"
+    model_name: str = "microsoft/deberta-v3-base"
     seed: int = 42
     max_length: int = 1024  # to avoid truncating majority of essays.
     lr: float = 1e-5
