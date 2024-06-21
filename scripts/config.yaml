@@ -1,6 +1,6 @@
 
 sampling_mode: False # True:データを100件にサンプリング
-model_name: 202406160030-develtav3-base-modeling # 実験名を記載 ※'_'は使わず'-'を利用する事
+model_name: 202406211818-develtav3-large-modeling # 実験名を記載 ※'_'は使わず'-'を利用する事
 target: score
 SEED: 2018
 n_splits: 5
