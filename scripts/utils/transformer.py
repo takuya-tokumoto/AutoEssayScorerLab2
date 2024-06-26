@@ -121,6 +121,7 @@ class EssayScorer:
             learning_rate=tr_config.lr,
             per_device_train_batch_size=tr_config.train_batch_size,
             per_device_eval_batch_size=tr_config.eval_batch_size,
+            gradient_accumulation_steps=tr_config.gradient_accumulation_size,
             num_train_epochs=tr_config.train_epochs,
             weight_decay=tr_config.weight_decay,
             evaluation_strategy="no",  # 評価を無効にする 'epoch',

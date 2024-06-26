@@ -23,8 +23,9 @@ class TransformerConfig:
     seed: int = 42
     max_length: int = 1024  # to avoid truncating majority of essays.
     lr: float = 1e-5
-    train_batch_size: int = 4
+    train_batch_size: int = 2
     eval_batch_size: int = 8
+    gradient_accumulation_size: int = 4
     train_epochs: int = 4
     weight_decay: float = 0.01
     warmup_ratio: float = 0.0
